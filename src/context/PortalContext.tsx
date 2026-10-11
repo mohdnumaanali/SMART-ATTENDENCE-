@@ -9,6 +9,7 @@ import {
   AttendanceRecord,
   Circular,
   UserSession,
+  ClassType,
 } from '../types';
 import {
   INITIAL_STUDENTS,
@@ -19,6 +20,18 @@ import {
   INITIAL_CIRCULARS,
   INITIAL_ATTENDANCE_RECORDS,
 } from '../data/seedData';
+
+interface SaveAttendancePayload {
+  batchName: string;
+  department: string;
+  yearSem: string;
+  courseCode: string;
+  date: string;
+  slotIds: string[];
+  classType: ClassType;
+  topicsCovered: string;
+  rosterStatuses: { rollNo: string; name: string; isPresent: boolean }[];
+}
 
 interface PortalContextType {
   // State
@@ -61,14 +74,8 @@ interface PortalContextType {
   addFaculty: (faculty: Omit<Faculty, 'id'>) => void;
   addCourse: (course: Omit<Course, 'id'>) => void;
 
-  // Attendance
-  saveAttendanceForRoster: (
-    batchName: string,
-    slot: TimetableSlot,
-    courseCode: string,
-    date: string,
-    rosterStatuses: { rollNo: string; name: string; isPresent: boolean }[]
-  ) => void;
+  // Multi-Slot Attendance Marking with L/T/P & Teaching Notes
+  saveAttendanceForRoster: (payload: SaveAttendancePayload) => void;
 
   // Student Metrics & Course Reports
   getStudentCourseAttendance: (rollNo: string) => {
@@ -92,13 +99,13 @@ interface PortalContextType {
 const PortalContext = createContext<PortalContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  STUDENTS: 'sru_portal_students_v3',
-  BATCHES: 'sru_portal_batches_v3',
-  FACULTY: 'sru_portal_faculty_v3',
-  COURSES: 'sru_portal_courses_v3',
-  ATTENDANCE: 'sru_portal_attendance_v3',
-  SESSION: 'sru_portal_session_v3',
-  ACADEMIC_YEAR: 'sru_portal_acad_year_v3',
+  STUDENTS: 'sru_portal_students_v4',
+  BATCHES: 'sru_portal_batches_v4',
+  FACULTY: 'sru_portal_faculty_v4',
+  COURSES: 'sru_portal_courses_v4',
+  ATTENDANCE: 'sru_portal_attendance_v4',
+  SESSION: 'sru_portal_session_v4',
+  ACADEMIC_YEAR: 'sru_portal_acad_year_v4',
 };
 
 export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -155,11 +162,19 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
   // Sync state to localStorage
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
+    try {
+      localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
+    } catch {
+      // ignore storage quota errors gracefully
+    }
   }, [students]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(batches));
+    try {
+      localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(batches));
+    } catch {
+      // ignore
+    }
   }, [batches]);
 
   useEffect(() => {
@@ -182,7 +197,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentUser]);
 
-  // Keep currentUser.studentData updated when student record changes (e.g. batch changed)
+  // Keep currentUser.studentData updated when student record changes
   useEffect(() => {
     if (currentUser?.role === 'student' && currentUser.username) {
       const updatedStd = students.find((s) => s.roll_no.toLowerCase() === currentUser.username.toLowerCase());
@@ -269,6 +284,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const newBatch: Batch = {
       ...batchData,
       id: `batch-${Date.now()}`,
+      student_count: 30,
       created_at: new Date().toISOString().split('T')[0],
     };
     setBatches((prev) => [...prev, newBatch]);
@@ -284,7 +300,6 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   const deleteBatch = (id: string) => {
     const batchToDelete = batches.find((b) => b.id === id);
     if (!batchToDelete) return;
-    // Reassign students of this batch to first remaining batch
     const remaining = batches.filter((b) => b.id !== id);
     const fallbackBatchName = remaining.length > 0 ? remaining[0].name : 'Unassigned';
     setStudents((prev) =>
@@ -360,44 +375,60 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setCourses((prev) => [...prev, newCourse]);
   };
 
-  // Save Attendance & Recalculate Attendance Pct
-  const saveAttendanceForRoster = (
-    batchName: string,
-    slot: TimetableSlot,
-    courseCode: string,
-    date: string,
-    rosterStatuses: { rollNo: string; name: string; isPresent: boolean }[]
-  ) => {
+  // Save Attendance for Roster supporting Multiple Slots, L/T/P, and Teaching Notes
+  const saveAttendanceForRoster = (payload: SaveAttendancePayload) => {
+    const {
+      batchName,
+      department,
+      yearSem,
+      courseCode,
+      date,
+      slotIds,
+      classType,
+      topicsCovered,
+      rosterStatuses,
+    } = payload;
+
     const targetCourse = courses.find((c) => c.code === courseCode);
     const courseName = targetCourse?.name || courseCode;
     const now = new Date().toISOString();
 
+    // Compute human readable slots string e.g. "Slot I, Slot II (09:30–11:30)"
+    const selectedSlotObjs = slots.filter((s) => slotIds.includes(s.id));
+    const slotNamesText = selectedSlotObjs.length > 0
+      ? `${selectedSlotObjs.map((s) => s.name).join(', ')} (${selectedSlotObjs[0].start_time}–${selectedSlotObjs[selectedSlotObjs.length - 1].end_time})`
+      : 'Regular Period';
+
     const newRecords: AttendanceRecord[] = rosterStatuses.map((item) => ({
       id: `att-${Date.now()}-${item.rollNo}`,
       date,
-      slot_id: slot.id,
-      slot_name: slot.name,
+      slot_ids: slotIds,
+      slot_names: slotNamesText,
+      class_type: classType,
+      topics_covered: topicsCovered,
       course_code: courseCode,
       course_name: courseName,
+      department,
+      year_sem: yearSem,
       batch_id: batchName,
       student_roll_no: item.rollNo,
       student_name: item.name,
       status: item.isPresent ? 'present' : 'absent',
-      marked_by: currentUser?.username || 'FAC001',
+      marked_by: currentUser?.name || currentUser?.username || 'FAC001',
       timestamp: now,
     }));
 
-    // Update attendance records
+    // Save attendance records
     setAttendanceRecords((prev) => [...newRecords, ...prev]);
 
-    // Update students attendance % slightly based on presence
+    // Recalculate student attendance percentage
     setStudents((prev) =>
       prev.map((std) => {
         const item = rosterStatuses.find((r) => r.rollNo === std.roll_no);
         if (!item) return std;
-        // Minor dynamic shift to reflect real live action
         const currentPct = std.attendance_pct;
-        const delta = item.isPresent ? 0.3 : -0.5;
+        const slotsCount = slotIds.length || 1;
+        const delta = item.isPresent ? (0.2 * slotsCount) : (-0.4 * slotsCount);
         const updatedPct = Math.min(100, Math.max(40, Math.round((currentPct + delta) * 10) / 10));
         return {
           ...std,
@@ -412,8 +443,11 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const student = students.find((s) => s.roll_no === rollNo) || students[0];
     const basePct = (student?.attendance_pct || 80) / 100;
 
-    return courses.map((course, idx) => {
-      // Create realistic variation per subject
+    // Filter courses relevant to student's department or semester
+    const relevantCourses = courses.filter((c) => c.department === student.department) || courses;
+    const listToUse = relevantCourses.length > 0 ? relevantCourses : courses.slice(0, 7);
+
+    return listToUse.map((course, idx) => {
       const variation = ((idx % 3) - 1) * 0.04;
       const effectivePct = Math.min(0.98, Math.max(0.48, basePct + variation));
       const held = course.total_classes_held;

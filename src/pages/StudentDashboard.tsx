@@ -148,17 +148,21 @@ export const StudentDashboard: React.FC<StudentDashboardProps> = ({ onNavigate }
 
             {/* Quick Demo Switcher */}
             <div className="flex items-center gap-2">
-              <span className="text-slate-500 text-[11px]">Preview other student:</span>
+              <span className="text-slate-500 text-[11px]">Preview other department student:</span>
               <select
                 value={student.roll_no}
                 onChange={(e) => switchStudentForDemo(e.target.value)}
                 aria-label="Preview student"
                 className="bg-white border border-slate-300 text-slate-800 text-xs px-2 py-0.5 rounded outline-none font-mono font-medium"
               >
-                <option value="SRU2024001">SRU2024001 (Batch 1)</option>
-                <option value="SRU2024040">SRU2024040 (Batch 2)</option>
-                <option value="SRU2024080">SRU2024080 (Batch 3)</option>
-                <option value="SRU2024007">SRU2024007 (&lt;75% Alert Student)</option>
+                <option value="SRU2024001">SRU2024001 (CSE 2-1 • 25CSE01)</option>
+                <option value="25CSE0501">25CSE0501 (CSE 1-1 • 25CSE05)</option>
+                <option value="25ECE0101">25ECE0101 (ECE 2-1 • 25ECE01)</option>
+                <option value="25EEE0101">25EEE0101 (EEE 2-1 • 25EEE01)</option>
+                <option value="25CE0101">25CE0101 (CE 2-1 • 25CE01)</option>
+                <option value="25ME0101">25ME0101 (ME 2-1 • 25ME01)</option>
+                <option value="25AGRI0101">25AGRI0101 (AGRI 2-1 • 25AGRI01)</option>
+                <option value="25BM0101">25BM0101 (BM 2-1 • 25BM01)</option>
               </select>
             </div>
           </div>

@@ -124,7 +124,7 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
                 <button
                   type="button"
                   onClick={() => {
-                    if (currentUser?.role === 'admin') onNavigate('/admin/dashboard');
+                    if (currentUser?.role === 'admin' || currentUser?.role === 'faculty') onNavigate('/admin/dashboard');
                     else onNavigate('/login?role=admin');
                   }}
                   className={`px-2.5 py-1.5 rounded transition-colors flex items-center gap-1 ${
@@ -132,10 +132,10 @@ export const Header: React.FC<HeaderProps> = ({ currentTab, onNavigate }) => {
                       ? 'bg-amber-500 text-slate-900 font-bold shadow'
                       : 'bg-white/10 hover:bg-white/20 text-blue-100'
                   }`}
-                  title="Admin Batch Management & Oversight"
+                  title="Admin & Faculty Shared Oversight (Metrics, Batches, Rosters)"
                 >
                   <ShieldAlert className="w-3.5 h-3.5" />
-                  <span className="hidden sm:inline">Admin</span>
+                  <span className="hidden sm:inline">Admin / Oversight</span>
                 </button>
               </div>
             </div>

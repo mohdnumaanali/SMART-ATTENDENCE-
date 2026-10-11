@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import { usePortal } from '../context/PortalContext';
-import { TimetableSlot } from '../types';
+import { ClassType } from '../types';
+import { DEPARTMENTS, SEMESTERS } from '../data/seedData';
 import {
   Calendar,
   Clock,
@@ -13,8 +14,12 @@ import {
   CheckCircle2,
   Layers,
   BookOpen,
-  Sparkles,
-  Info,
+  Edit3,
+  ShieldCheck,
+  CheckSquare,
+  Square,
+  AlertCircle,
+  BarChart3,
 } from 'lucide-react';
 
 interface FacultyAttendanceProps {
@@ -32,49 +37,82 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
   } = usePortal();
 
   // Dynamic Selection Toolbar States
-  const [selectedDept, setSelectedDept] = useState('CSE-AIML');
+  const [selectedDept, setSelectedDept] = useState('CSE');
   const [selectedYearSem, setSelectedYearSem] = useState('2-1');
-  const [selectedCourseCode, setSelectedCourseCode] = useState('CS2101');
-  // Default to first batch '25CAIBTAIB01'
-  const [selectedBatch, setSelectedBatch] = useState<string>('25CAIBTAIB01');
 
-  // Timetable Slot Selection (Slots I through VIII)
-  const [activeSlotId, setActiveSlotId] = useState<string>('slot-1');
+  // Filter batches dynamically for selected department & semester
+  const availableBatches = useMemo(() => {
+    return batches.filter(
+      (b) => b.department === selectedDept && b.year_sem === selectedYearSem
+    );
+  }, [batches, selectedDept, selectedYearSem]);
+
+  // Selected Batch (defaults to first batch of filtered department/semester)
+  const [selectedBatch, setSelectedBatch] = useState<string>('');
+
+  useEffect(() => {
+    if (availableBatches.length > 0) {
+      setSelectedBatch(availableBatches[0].name);
+    } else {
+      setSelectedBatch('ALL');
+    }
+  }, [availableBatches]);
+
+  // Filter courses relevant to department & semester
+  const availableCourses = useMemo(() => {
+    const list = courses.filter(
+      (c) => c.department === selectedDept && (c.year_sem === selectedYearSem || !c.year_sem)
+    );
+    if (list.length > 0) return list;
+    return courses.filter((c) => c.department === selectedDept);
+  }, [courses, selectedDept, selectedYearSem]);
+
+  const [selectedCourseCode, setSelectedCourseCode] = useState<string>('CS2101');
+
+  useEffect(() => {
+    if (availableCourses.length > 0) {
+      setSelectedCourseCode(availableCourses[0].code);
+    }
+  }, [availableCourses]);
+
+  // Timetable Slot Selection (ALLOW MULTIPLE SLOTS FOR A SINGLE PERIOD!)
+  const [selectedSlotIds, setSelectedSlotIds] = useState<string[]>(['slot-1']);
   const [date, setDate] = useState<string>(() => new Date().toISOString().split('T')[0]);
+
+  // Class Type: Lecture (L), Tutorial (T), Practical Lab (P)
+  const [classType, setClassType] = useState<ClassType>('L');
+
+  // "What was taught today" text box
+  const [topicsCovered, setTopicsCovered] = useState<string>('');
 
   // Search filter inside roster
   const [searchQuery, setSearchQuery] = useState('');
 
   // Save feedback state
   const [saveSuccessMessage, setSaveSuccessMessage] = useState<string | null>(null);
+  const [validationError, setValidationError] = useState<string | null>(null);
 
   // Roster attendance status map: { [roll_no]: boolean } (true = present, false = absent)
   const [attendanceMap, setAttendanceMap] = useState<Record<string, boolean>>({});
 
-  // Dynamic batch options based on department & sem
-  const batchOptions = useMemo(() => {
-    return batches.filter(
-      (b) => b.department === selectedDept || selectedDept === 'ALL'
-    );
-  }, [batches, selectedDept]);
-
-  // Filter students based strictly on dynamic Batch selection & Department
+  // Faculty should ONLY see students relevant to their department/semester filters!
   const filteredStudents = useMemo(() => {
-    let result = students;
+    // 1. Strict Department Filter
+    let result = students.filter((s) => s.department === selectedDept);
 
-    // Filter by Dept
-    if (selectedDept && selectedDept !== 'ALL') {
-      result = result.filter((s) => s.department === selectedDept);
+    // 2. Strict Semester Filter
+    if (selectedYearSem) {
+      result = result.filter((s) => s.year_sem === selectedYearSem);
     }
 
-    // Filter by Batch (CRITICAL REQUIREMENT)
+    // 3. Batch Filter (defaults to 30 students of selected batch)
     if (selectedBatch && selectedBatch !== 'ALL' && selectedBatch !== 'All Batches') {
       result = result.filter(
         (s) => s.batch_id.toLowerCase() === selectedBatch.toLowerCase()
       );
     }
 
-    // Filter by Search Query
+    // 4. Search Filter
     if (searchQuery.trim()) {
       const q = searchQuery.toLowerCase();
       result = result.filter(
@@ -83,21 +121,32 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
     }
 
     return result;
-  }, [students, selectedDept, selectedBatch, searchQuery]);
+  }, [students, selectedDept, selectedYearSem, selectedBatch, searchQuery]);
 
-  // Initialize or update attendance map when roster changes
+  // Initialize roster status when students change
   useEffect(() => {
     setAttendanceMap((prev) => {
       const next: Record<string, boolean> = { ...prev };
-      // Default new students in view to present (true)
       filteredStudents.forEach((s) => {
         if (next[s.roll_no] === undefined) {
-          next[s.roll_no] = true;
+          next[s.roll_no] = true; // Default present
         }
       });
       return next;
     });
   }, [filteredStudents]);
+
+  // Multi-slot toggle
+  const toggleSlotSelection = (slotId: string) => {
+    setSelectedSlotIds((prev) => {
+      if (prev.includes(slotId)) {
+        if (prev.length === 1) return prev; // Keep at least one slot
+        return prev.filter((id) => id !== slotId);
+      } else {
+        return [...prev, slotId];
+      }
+    });
+  };
 
   // Action: Check All
   const handleCheckAll = () => {
@@ -135,58 +184,92 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
   const absentCount = totalRosterCount - presentCount;
   const attendanceRate = totalRosterCount > 0 ? Math.round((presentCount / totalRosterCount) * 100) : 0;
 
-  // Selected Slot details
-  const activeSlot = slots.find((s) => s.id === activeSlotId) || slots[0];
-  const selectedCourse = courses.find((c) => c.code === selectedCourseCode) || courses[0];
+  // Selected course details
+  const selectedCourse = courses.find((c) => c.code === selectedCourseCode) || availableCourses[0];
 
   // Save Attendance to Database / Context
   const handleSaveAttendance = () => {
+    setValidationError(null);
+
+    if (selectedSlotIds.length === 0) {
+      setValidationError('Please select at least one timetable slot.');
+      return;
+    }
+
+    if (!topicsCovered.trim()) {
+      setValidationError('Please enter "What was taught today" before submitting attendance.');
+      return;
+    }
+
     const rosterData = filteredStudents.map((s) => ({
       rollNo: s.roll_no,
       name: s.name,
       isPresent: attendanceMap[s.roll_no] !== false,
     }));
 
-    saveAttendanceForRoster(
-      selectedBatch,
-      activeSlot,
-      selectedCourseCode,
+    saveAttendanceForRoster({
+      batchName: selectedBatch,
+      department: selectedDept,
+      yearSem: selectedYearSem,
+      courseCode: selectedCourseCode,
       date,
-      rosterData
-    );
+      slotIds: selectedSlotIds,
+      classType,
+      topicsCovered: topicsCovered.trim(),
+      rosterStatuses: rosterData,
+    });
+
+    const slotNamesText = slots
+      .filter((s) => selectedSlotIds.includes(s.id))
+      .map((s) => s.name)
+      .join(', ');
 
     setSaveSuccessMessage(
-      `Attendance for ${activeSlot.name} (${selectedCourse.name}) successfully recorded! ${presentCount} Present, ${absentCount} Absent persisted to database.`
+      `Attendance recorded for ${slotNamesText} (${classType === 'L' ? 'Lecture' : classType === 'T' ? 'Tutorial' : 'Practical Lab'})! Batch: ${selectedBatch} — ${presentCount} Present, ${absentCount} Absent.`
     );
 
+    // Keep topicsCovered or clear
     setTimeout(() => {
       setSaveSuccessMessage(null);
-    }, 5000);
+    }, 6000);
   };
 
   return (
     <div className="min-h-screen bg-slate-50 pb-16">
       <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
-        {/* Page Title & Faculty Header */}
+        {/* Page Title & Equal Access Faculty Banner */}
         <div className="bg-white p-4 sm:p-5 rounded-xl border border-slate-200 shadow-xs flex flex-wrap items-center justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
               <span className="text-xs uppercase font-bold text-amber-600 bg-amber-50 border border-amber-200 px-2 py-0.5 rounded">
-                Faculty Attendance Portal
+                Faculty Portal
               </span>
               <span className="text-xs text-slate-500 font-mono">
                 {currentUser?.name || 'Dr. K. Venkataswamy'} ({currentUser?.username || 'FAC001'})
               </span>
+              <span className="text-xs bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded font-semibold">
+                Equal Faculty Permissions
+              </span>
             </div>
             <h1 className="text-xl sm:text-2xl font-bold font-serif text-[#1A3B70] mt-1">
-              Mark Student Period Attendance
+              Mark Student Attendance & Session Log
             </h1>
             <p className="text-xs text-slate-600">
-              Department of {selectedDept} • Timetable Slots I through VIII
+              Department of {selectedDept} • Semester {selectedYearSem} • Batch: <strong className="text-blue-900">{selectedBatch}</strong> ({totalRosterCount} Students)
             </p>
           </div>
 
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => onNavigate('/admin/dashboard')}
+              className="px-3 py-2 bg-purple-50 hover:bg-purple-100 text-purple-900 border border-purple-200 text-xs font-bold rounded-lg transition-colors flex items-center gap-1.5 shadow-2xs"
+              title="All faculty have equal access to Admin dashboard metrics & batch management"
+            >
+              <BarChart3 className="w-4 h-4 text-purple-700" />
+              <span>Admin Dashboard & Metrics →</span>
+            </button>
+
             <div className="flex items-center gap-2 bg-slate-50 p-2 rounded-lg border border-slate-200">
               <Calendar className="w-4 h-4 text-blue-700" />
               <input
@@ -203,7 +286,7 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
               className="bg-[#28A745] hover:bg-green-700 text-white font-bold text-xs sm:text-sm px-4 py-2.5 rounded-lg shadow-sm transition-all flex items-center gap-2"
             >
               <Save className="w-4 h-4" />
-              <span>Save Attendance</span>
+              <span>Submit Attendance</span>
             </button>
           </div>
         </div>
@@ -225,15 +308,28 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
           </div>
         )}
 
-        {/* 1. DYNAMIC SELECTION TOOLBAR (Batch & Filters Selection) */}
+        {/* Validation Error Banner */}
+        {validationError && (
+          <div className="bg-red-50 border-l-4 border-red-600 p-3.5 rounded-r-lg text-xs text-red-900 flex items-center gap-2">
+            <AlertCircle className="w-4 h-4 text-red-600 shrink-0" />
+            <span className="font-semibold">{validationError}</span>
+          </div>
+        )}
+
+        {/* 1. DYNAMIC SELECTION TOOLBAR (Department, Semester, Course, Batch) */}
         <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-4 sm:p-5">
-          <div className="flex items-center gap-2 pb-3 mb-4 border-b border-slate-100 text-xs font-bold text-[#1A3B70] uppercase tracking-wider">
-            <Filter className="w-4 h-4" />
-            <span>Academic Selection & Batch Filter Toolbar</span>
+          <div className="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+            <div className="flex items-center gap-2 text-xs font-bold text-[#1A3B70] uppercase tracking-wider">
+              <Filter className="w-4 h-4" />
+              <span>Academic Filter Toolbar (Shows Department & Semester Specific Students)</span>
+            </div>
+            <span className="text-xs text-slate-500 font-medium">
+              Available Batches for {selectedDept} {selectedYearSem}: <strong>{availableBatches.length}</strong> (30 students each)
+            </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            {/* Department Dropdown */}
+            {/* Department Dropdown (74 CSE, 20-30 other depts) */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                 <Users className="w-3.5 h-3.5 text-blue-700" />
@@ -242,31 +338,32 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
               <select
                 value={selectedDept}
                 onChange={(e) => setSelectedDept(e.target.value)}
-                className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1A3B70] outline-none bg-white font-medium"
+                className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1A3B70] outline-none bg-white font-bold text-slate-800"
               >
-                <option value="CSE-AIML">CSE-AIML (Artificial Intelligence)</option>
-                <option value="ECE">ECE (Electronics & Comm)</option>
-                <option value="EEE">EEE (Electrical & Electronics)</option>
-                <option value="ALL">All Departments</option>
+                {DEPARTMENTS.map((dept) => (
+                  <option key={dept.code} value={dept.code}>
+                    {dept.code} - {dept.name} ({dept.batchCount} Batches)
+                  </option>
+                ))}
               </select>
             </div>
 
-            {/* Year/Semester Dropdown */}
+            {/* Year/Semester Dropdown (1-1 to 4-2) */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                 <Calendar className="w-3.5 h-3.5 text-blue-700" />
-                <span>Year / Semester:</span>
+                <span>Semester:</span>
               </label>
               <select
                 value={selectedYearSem}
                 onChange={(e) => setSelectedYearSem(e.target.value)}
                 className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1A3B70] outline-none bg-white font-medium"
               >
-                <option value="2-1">II Year - I Semester (2-1)</option>
-                <option value="2-2">II Year - II Semester (2-2)</option>
-                <option value="3-1">III Year - I Semester (3-1)</option>
-                <option value="3-2">III Year - II Semester (3-2)</option>
-                <option value="4-1">IV Year - I Semester (4-1)</option>
+                {SEMESTERS.map((sem) => (
+                  <option key={sem} value={sem}>
+                    Semester {sem}
+                  </option>
+                ))}
               </select>
             </div>
 
@@ -281,7 +378,7 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
                 onChange={(e) => setSelectedCourseCode(e.target.value)}
                 className="w-full px-3 py-2 text-xs sm:text-sm border border-slate-300 rounded-lg focus:ring-2 focus:ring-[#1A3B70] outline-none bg-white font-medium"
               >
-                {courses.map((c) => (
+                {availableCourses.map((c) => (
                   <option key={c.id} value={c.code}>
                     {c.code} - {c.name}
                   </option>
@@ -289,77 +386,80 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
               </select>
             </div>
 
-            {/* Batch Dropdown (CRITICAL REQUIREMENT) */}
+            {/* Batch Dropdown (Dynamically populated from 74 CSE or other batches) */}
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                 <Layers className="w-3.5 h-3.5 text-blue-700" />
-                <span>Select Batch (Section/Lab):</span>
+                <span>Batch (30 Students per Batch):</span>
               </label>
               <select
                 value={selectedBatch}
                 onChange={(e) => setSelectedBatch(e.target.value)}
-                className="w-full px-3 py-2 text-xs sm:text-sm border-2 border-blue-500 rounded-lg focus:ring-2 focus:ring-[#1A3B70] outline-none bg-blue-50/50 font-bold text-[#1A3B70]"
+                className="w-full px-3 py-2 text-xs sm:text-sm border-2 border-blue-600 rounded-lg focus:ring-2 focus:ring-[#1A3B70] outline-none bg-blue-50/60 font-bold text-[#1A3B70]"
               >
-                <option value="ALL">All Batches (Combined Class - {students.length} Students)</option>
-                {batchOptions.map((b) => (
+                {availableBatches.map((b) => (
                   <option key={b.id} value={b.name}>
-                    {b.displayName}
+                    {b.name} ({b.student_count} Students)
                   </option>
                 ))}
+                <option value="ALL">All Batches in {selectedDept} {selectedYearSem} Combined</option>
               </select>
-              <span className="text-[10px] text-blue-700 mt-1 block">
-                {selectedBatch === 'ALL'
-                  ? 'Showing all batches combined'
-                  : `Roster filtered strictly to batch: ${selectedBatch}`}
-              </span>
             </div>
           </div>
         </div>
 
-        {/* 2. TIMETABLE PERIOD SLOTS (Slots I through VIII) */}
+        {/* 2. TIMETABLE SLOTS (Multiple Slots Allowed for Single Period, Start/End Time Only!) */}
         <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-4 sm:p-5">
           <div className="flex flex-wrap items-center justify-between gap-2 pb-3 mb-3 border-b border-slate-100">
             <div className="flex items-center gap-2">
               <Clock className="w-4 h-4 text-[#1A3B70]" />
               <h3 className="font-bold text-xs sm:text-sm text-slate-800 uppercase tracking-wide">
-                Daily Timetable Slots (Click checkbox to activate period)
+                Timetable Slots (Multiple slots can be selected for a double period or lab!)
               </h3>
             </div>
-            <span className="text-xs text-slate-500">
-              Active Lecture Period: <strong className="text-[#1A3B70]">{activeSlot.name} ({activeSlot.time_range})</strong>
-            </span>
+            <div className="flex items-center gap-2 text-xs">
+              <span className="text-slate-500">Selected Slots:</span>
+              <span className="font-bold font-mono text-[#1A3B70] bg-blue-100 px-2 py-0.5 rounded">
+                {selectedSlotIds.length} Slot(s) Active
+              </span>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-2.5">
             {slots.map((slot) => {
-              const isSelected = activeSlotId === slot.id;
+              const isChecked = selectedSlotIds.includes(slot.id);
               return (
                 <div
                   key={slot.id}
-                  onClick={() => setActiveSlotId(slot.id)}
-                  className={`p-2.5 rounded-lg border-2 cursor-pointer transition-all flex flex-col justify-between select-none ${
-                    isSelected
-                      ? 'border-[#1A3B70] bg-blue-50/80 shadow-xs'
+                  onClick={() => toggleSlotSelection(slot.id)}
+                  className={`p-3 rounded-lg border-2 cursor-pointer transition-all flex flex-col justify-between select-none ${
+                    isChecked
+                      ? 'border-[#1A3B70] bg-blue-50 shadow-xs ring-1 ring-[#1A3B70]'
                       : 'border-slate-200 bg-white hover:border-slate-300 hover:bg-slate-50'
                   }`}
                 >
                   <div className="flex items-center justify-between">
-                    <span className={`text-xs font-bold ${isSelected ? 'text-[#1A3B70]' : 'text-slate-800'}`}>
+                    <span className={`text-xs font-bold ${isChecked ? 'text-[#1A3B70]' : 'text-slate-800'}`}>
                       {slot.name}
                     </span>
                     <input
                       type="checkbox"
-                      checked={isSelected}
-                      onChange={() => setActiveSlotId(slot.id)}
+                      checked={isChecked}
+                      onChange={() => toggleSlotSelection(slot.id)}
                       className="w-4 h-4 text-[#1A3B70] rounded border-slate-300 focus:ring-[#1A3B70] cursor-pointer"
                     />
                   </div>
-                  <div className="mt-2 text-[10px] text-slate-500 font-mono">
-                    {slot.time_range}
+                  {/* Start time and End time ONLY (no subject names) */}
+                  <div className="mt-2 text-xs font-mono font-semibold text-slate-700">
+                    {slot.start_time}–{slot.end_time}
                   </div>
                   <div className="mt-1">
-                    <span className={`text-[9px] px-1 py-0.2 rounded font-semibold uppercase ${isSelected ? 'bg-[#1A3B70] text-white' : 'bg-slate-100 text-slate-600'}`}>
-                      {isSelected ? 'ACTIVE' : 'READY'}
+                    <span
+                      className={`text-[9px] px-1.5 py-0.5 rounded font-semibold uppercase ${
+                        isChecked ? 'bg-[#1A3B70] text-white' : 'bg-slate-100 text-slate-500'
+                      }`}
+                    >
+                      {isChecked ? 'SELECTED' : 'OFF'}
                     </span>
                   </div>
                 </div>
@@ -368,9 +468,83 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
           </div>
         </div>
 
-        {/* 3. ACTION BAR & LIVE COUNTER METRICS */}
+        {/* 3. FACULTY ATTENDANCE OPTIONS: Class Type (L/T/P) & "What was taught today" Textbox */}
+        <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-4 sm:p-5 space-y-4">
+          <div className="flex items-center gap-2 pb-2 border-b border-slate-100 text-xs font-bold text-[#1A3B70] uppercase tracking-wide">
+            <Edit3 className="w-4 h-4" />
+            <span>Session Classification & Teaching Log</span>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-12 gap-4 items-start">
+            {/* Class Type Selection: Lecture (L), Tutorial (T), Practical Lab (P) */}
+            <div className="md:col-span-4 bg-slate-50 p-3.5 rounded-lg border border-slate-200 space-y-2">
+              <label className="block text-xs font-bold text-slate-700">
+                Type of Class for Attendance:
+              </label>
+              <div className="grid grid-cols-3 gap-2">
+                <button
+                  type="button"
+                  onClick={() => setClassType('L')}
+                  className={`py-2 px-1 text-center rounded-md font-bold text-xs transition-all border ${
+                    classType === 'L'
+                      ? 'bg-[#1A3B70] text-white border-[#1A3B70] shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="block text-sm font-black">L</span>
+                  <span className="text-[10px] font-normal">Lecture</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setClassType('T')}
+                  className={`py-2 px-1 text-center rounded-md font-bold text-xs transition-all border ${
+                    classType === 'T'
+                      ? 'bg-amber-600 text-white border-amber-600 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="block text-sm font-black">T</span>
+                  <span className="text-[10px] font-normal">Tutorial</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => setClassType('P')}
+                  className={`py-2 px-1 text-center rounded-md font-bold text-xs transition-all border ${
+                    classType === 'P'
+                      ? 'bg-teal-700 text-white border-teal-700 shadow-xs'
+                      : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+                  }`}
+                >
+                  <span className="block text-sm font-black">P</span>
+                  <span className="text-[10px] font-normal">Practical Lab</span>
+                </button>
+              </div>
+              <p className="text-[11px] text-slate-500">
+                Selected: <strong>{classType === 'L' ? 'Lecture (Theory)' : classType === 'T' ? 'Tutorial (Problem Solving)' : 'Practical Laboratory Experiment'}</strong>
+              </p>
+            </div>
+
+            {/* "What was taught today" Textbox */}
+            <div className="md:col-span-8 space-y-1.5">
+              <label className="block text-xs font-bold text-slate-800 flex items-center justify-between">
+                <span>What was taught today (Session Topics & Learning Outcomes):</span>
+                <span className="text-[11px] font-normal text-slate-400">Required before submission</span>
+              </label>
+              <textarea
+                value={topicsCovered}
+                onChange={(e) => setTopicsCovered(e.target.value)}
+                placeholder="e.g. Unit 3: Graph Traversal Algorithms — BFS & DFS implementation with queue/stack, cycle detection, and time complexity analysis..."
+                rows={3}
+                className="w-full p-2.5 text-xs sm:text-sm border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-[#1A3B70] bg-white text-slate-800 placeholder-slate-400"
+              />
+            </div>
+          </div>
+        </div>
+
+        {/* 4. ACTION BAR & LIVE COUNTER METRICS */}
         <div className="bg-white rounded-xl shadow-xs border border-slate-200 p-4 flex flex-wrap items-center justify-between gap-4">
-          {/* Action Buttons: Check All & UnCheck All (Red Button) */}
           <div className="flex flex-wrap items-center gap-2">
             <button
               type="button"
@@ -390,7 +564,7 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
               <span>UnCheck All (Absent)</span>
             </button>
 
-            {/* Quick search input within roster */}
+            {/* Quick search input */}
             <div className="relative ml-2">
               <Search className="w-3.5 h-3.5 text-slate-400 absolute left-2.5 top-2.5" />
               <input
@@ -406,7 +580,7 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
           {/* Live Attendance Metric Badges */}
           <div className="flex flex-wrap items-center gap-2 sm:gap-3 text-xs">
             <div className="bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
-              <span className="text-slate-500">Roster Total:</span>{' '}
+              <span className="text-slate-500">Roster Students:</span>{' '}
               <strong className="font-mono text-slate-800 font-bold">{totalRosterCount}</strong>
             </div>
 
@@ -427,19 +601,19 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
           </div>
         </div>
 
-        {/* 4. STUDENT ROSTER ATTENDANCE TABLE */}
+        {/* 5. STUDENT ROSTER ATTENDANCE TABLE */}
         <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
           <div className="bg-[#1A3B70] text-white px-5 py-3.5 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-2">
               <Users className="w-4 h-4 text-amber-400" />
               <h3 className="font-bold text-sm tracking-wide">
-                Student Attendance Roster — {selectedBatch === 'ALL' ? 'All Batches' : `Batch: ${selectedBatch}`}
+                Student Attendance Roster — Batch: {selectedBatch} ({selectedDept} Sem {selectedYearSem})
               </h3>
             </div>
             <div className="text-xs text-blue-200 flex items-center gap-2 font-mono">
-              <span>Selected Course: {selectedCourse.code} ({selectedCourse.name})</span>
+              <span>Class Type: [{classType}]</span>
               <span>•</span>
-              <span>{activeSlot.name}</span>
+              <span>{selectedCourse?.name || selectedCourseCode}</span>
             </div>
           </div>
 
@@ -451,6 +625,7 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
                   <th className="py-3 px-4 w-36">Roll Number</th>
                   <th className="py-3 px-4">Student Name</th>
                   <th className="py-3 px-4 text-slate-500">Father's Name</th>
+                  <th className="py-3 px-4 text-center w-28">Dept / Sem</th>
                   <th className="py-3 px-4 text-center w-36">Batch ID</th>
                   <th className="py-3 px-4 text-center w-28">Cum. %</th>
                   <th className="py-3 px-4 text-center w-36">Status Checkbox</th>
@@ -459,8 +634,8 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
               <tbody className="divide-y divide-slate-100">
                 {filteredStudents.length === 0 ? (
                   <tr>
-                    <td colSpan={7} className="py-8 text-center text-slate-500">
-                      No students found for Batch: <strong>{selectedBatch}</strong>.
+                    <td colSpan={8} className="py-8 text-center text-slate-500">
+                      No students found for Department: <strong>{selectedDept}</strong>, Semester: <strong>{selectedYearSem}</strong>, Batch: <strong>{selectedBatch}</strong>.
                     </td>
                   </tr>
                 ) : (
@@ -492,6 +667,9 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
                         </td>
                         <td className="py-2.5 px-4 text-slate-500 text-xs">
                           {std.father_name}
+                        </td>
+                        <td className="py-2.5 px-4 text-center text-xs font-mono text-slate-600">
+                          {std.department} ({std.year_sem})
                         </td>
                         <td className="py-2.5 px-4 text-center">
                           <span className="font-mono text-xs bg-slate-100 text-[#1A3B70] px-2 py-0.5 rounded font-semibold border border-slate-200">
@@ -538,7 +716,7 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
           {/* Table Footer with Persistent Save Button */}
           <div className="bg-slate-50 px-5 py-3 border-t border-slate-200 flex flex-wrap items-center justify-between gap-3">
             <span className="text-xs text-slate-500">
-              Showing <strong>{filteredStudents.length}</strong> of {students.length} total students
+              Showing <strong>{filteredStudents.length}</strong> students for Batch: <strong>{selectedBatch}</strong>
             </span>
 
             <div className="flex items-center gap-3">
@@ -555,7 +733,7 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
                 className="bg-[#28A745] hover:bg-green-700 text-white font-bold text-xs sm:text-sm px-5 py-2 rounded-lg shadow-sm transition-all flex items-center gap-2"
               >
                 <Save className="w-4 h-4" />
-                <span>Save Attendance Records</span>
+                <span>Submit Attendance & Teaching Log</span>
               </button>
             </div>
           </div>
