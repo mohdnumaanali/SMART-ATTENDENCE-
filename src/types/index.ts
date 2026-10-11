@@ -17,6 +17,8 @@ export interface Student {
   email: string;
   phone: string;
   avatar?: string;
+  password?: string;
+  is_active: boolean; // Admin can assign or revoke account
 }
 
 export interface Batch {
@@ -40,6 +42,9 @@ export interface Faculty {
   email: string;
   phone: string;
   courses: string[];
+  username: string;
+  password?: string;
+  is_active: boolean; // Admin can assign or revoke account
 }
 
 export interface Course {
@@ -78,6 +83,26 @@ export interface AttendanceRecord {
   status: 'present' | 'absent';
   marked_by: string;
   timestamp: string;
+}
+
+export interface CompletedClassSession {
+  id: string;
+  date: string;
+  timestamp: string;
+  faculty_id: string;
+  faculty_name: string;
+  department: string;
+  year_sem: string;
+  batch_id: string;
+  course_code: string;
+  course_name: string;
+  slot_ids: string[];
+  slot_names: string;
+  class_type: ClassType;
+  topics_covered: string;
+  total_students: number;
+  present_count: number;
+  absent_count: number;
 }
 
 export interface Circular {

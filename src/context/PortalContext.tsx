@@ -7,6 +7,7 @@ import {
   Course,
   TimetableSlot,
   AttendanceRecord,
+  CompletedClassSession,
   Circular,
   UserSession,
   ClassType,
@@ -19,6 +20,7 @@ import {
   INITIAL_SLOTS,
   INITIAL_CIRCULARS,
   INITIAL_ATTENDANCE_RECORDS,
+  INITIAL_COMPLETED_SESSIONS,
 } from '../data/seedData';
 
 interface SaveAttendancePayload {
@@ -42,14 +44,30 @@ interface PortalContextType {
   slots: TimetableSlot[];
   circulars: Circular[];
   attendanceRecords: AttendanceRecord[];
+  completedSessions: CompletedClassSession[];
   currentUser: UserSession | null;
   academicYear: string;
   setAcademicYear: (year: string) => void;
 
-  // Auth
-  login: (role: Role, username: string, password?: string) => boolean;
+  // Auth & Password Management
+  login: (role: Role, username: string, password?: string) => { success: boolean; message?: string };
   logout: () => void;
   switchStudentForDemo: (rollNo: string) => void;
+  changeCurrentUserPassword: (newPassword: string) => boolean;
+
+  // Admin Account & Credential Management
+  updateUserCredentials: (
+    role: 'faculty' | 'student',
+    idOrRoll: string,
+    newUsername: string,
+    newPassword?: string
+  ) => void;
+  toggleAccountStatus: (
+    role: 'faculty' | 'student',
+    idOrRoll: string,
+    isActive: boolean
+  ) => void;
+  resetUserPassword: (role: 'faculty' | 'student', idOrRoll: string) => string;
 
   // Batch Management
   addBatch: (batch: {
@@ -72,6 +90,8 @@ interface PortalContextType {
   updateStudent: (rollNo: string, updates: Partial<Student>) => void;
   deleteStudent: (rollNo: string) => void;
   addFaculty: (faculty: Omit<Faculty, 'id'>) => void;
+  updateFaculty: (facultyId: string, updates: Partial<Faculty>) => void;
+  deleteFaculty: (facultyId: string) => void;
   addCourse: (course: Omit<Course, 'id'>) => void;
 
   // Multi-Slot Attendance Marking with L/T/P & Teaching Notes
@@ -99,13 +119,14 @@ interface PortalContextType {
 const PortalContext = createContext<PortalContextType | undefined>(undefined);
 
 const STORAGE_KEYS = {
-  STUDENTS: 'sru_portal_students_v4',
-  BATCHES: 'sru_portal_batches_v4',
-  FACULTY: 'sru_portal_faculty_v4',
-  COURSES: 'sru_portal_courses_v4',
-  ATTENDANCE: 'sru_portal_attendance_v4',
-  SESSION: 'sru_portal_session_v4',
-  ACADEMIC_YEAR: 'sru_portal_acad_year_v4',
+  STUDENTS: 'sru_portal_students_v5',
+  BATCHES: 'sru_portal_batches_v5',
+  FACULTY: 'sru_portal_faculty_v5',
+  COURSES: 'sru_portal_courses_v5',
+  ATTENDANCE: 'sru_portal_attendance_v5',
+  COMPLETED_SESSIONS: 'sru_portal_sessions_v5',
+  SESSION: 'sru_portal_session_v5',
+  ACADEMIC_YEAR: 'sru_portal_acad_year_v5',
 };
 
 export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -137,6 +158,11 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     return saved ? JSON.parse(saved) : INITIAL_ATTENDANCE_RECORDS;
   });
 
+  const [completedSessions, setCompletedSessions] = useState<CompletedClassSession[]>(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.COMPLETED_SESSIONS);
+    return saved ? JSON.parse(saved) : INITIAL_COMPLETED_SESSIONS;
+  });
+
   const [academicYear, setAcademicYearState] = useState<string>(() => {
     return localStorage.getItem(STORAGE_KEYS.ACADEMIC_YEAR) || '2024-25';
   });
@@ -150,7 +176,6 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         // fallback
       }
     }
-    // Default logged in user: Student SRU2024001
     const defaultStudent = INITIAL_STUDENTS[0];
     return {
       role: 'student',
@@ -165,7 +190,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       localStorage.setItem(STORAGE_KEYS.STUDENTS, JSON.stringify(students));
     } catch {
-      // ignore storage quota errors gracefully
+      // quota safeguard
     }
   }, [students]);
 
@@ -173,12 +198,16 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     try {
       localStorage.setItem(STORAGE_KEYS.BATCHES, JSON.stringify(batches));
     } catch {
-      // ignore
+      // quota safeguard
     }
   }, [batches]);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_KEYS.FACULTY, JSON.stringify(faculty));
+    try {
+      localStorage.setItem(STORAGE_KEYS.FACULTY, JSON.stringify(faculty));
+    } catch {
+      // quota safeguard
+    }
   }, [faculty]);
 
   useEffect(() => {
@@ -190,6 +219,10 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
   }, [attendanceRecords]);
 
   useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.COMPLETED_SESSIONS, JSON.stringify(completedSessions));
+  }, [completedSessions]);
+
+  useEffect(() => {
     if (currentUser) {
       localStorage.setItem(STORAGE_KEYS.SESSION, JSON.stringify(currentUser));
     } else {
@@ -197,39 +230,69 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     }
   }, [currentUser]);
 
-  // Keep currentUser.studentData updated when student record changes
+  // Keep currentUser synced
   useEffect(() => {
     if (currentUser?.role === 'student' && currentUser.username) {
       const updatedStd = students.find((s) => s.roll_no.toLowerCase() === currentUser.username.toLowerCase());
       if (updatedStd && JSON.stringify(updatedStd) !== JSON.stringify(currentUser.studentData)) {
         setCurrentUser((prev) => (prev ? { ...prev, name: updatedStd.name, studentData: updatedStd } : null));
       }
+    } else if (currentUser?.role === 'faculty' && currentUser.username) {
+      const updatedFac = faculty.find(
+        (f) => f.faculty_id.toLowerCase() === currentUser.username.toLowerCase() || f.username.toLowerCase() === currentUser.username.toLowerCase()
+      );
+      if (updatedFac && JSON.stringify(updatedFac) !== JSON.stringify(currentUser.facultyData)) {
+        setCurrentUser((prev) => (prev ? { ...prev, name: updatedFac.name, facultyData: updatedFac } : null));
+      }
     }
-  }, [students, currentUser?.role, currentUser?.username]);
+  }, [students, faculty, currentUser?.role, currentUser?.username]);
 
   const setAcademicYear = (year: string) => {
     setAcademicYearState(year);
     localStorage.setItem(STORAGE_KEYS.ACADEMIC_YEAR, year);
   };
 
-  // Auth functions
-  const login = (role: Role, username: string, _password?: string): boolean => {
+  // Auth functions with active account check & password verification
+  const login = (role: Role, username: string, password?: string): { success: boolean; message?: string } => {
     const cleanUser = username.trim().toUpperCase();
+    const cleanPass = (password || '').trim();
 
     if (role === 'admin') {
+      if (cleanPass && cleanPass !== 'admin123') {
+        return { success: false, message: 'Invalid Admin password. Default is: admin123' };
+      }
       const adminSession: UserSession = {
         role: 'admin',
         username: 'ADMIN',
         name: 'System Administrator (Dean Academics)',
       };
       setCurrentUser(adminSession);
-      return true;
+      return { success: true };
     }
 
     if (role === 'faculty') {
       const foundFaculty = faculty.find(
-        (f) => f.faculty_id.toUpperCase() === cleanUser || f.email.toUpperCase() === cleanUser
-      ) || faculty[0];
+        (f) =>
+          f.faculty_id.toUpperCase() === cleanUser ||
+          f.username.toUpperCase() === cleanUser ||
+          f.email.toUpperCase() === cleanUser
+      );
+
+      if (!foundFaculty) {
+        return { success: false, message: `Faculty account ${cleanUser} not found.` };
+      }
+
+      if (foundFaculty.is_active === false) {
+        return {
+          success: false,
+          message: `Account for ${foundFaculty.name} has been revoked by Administrator. Please contact Dean Academics.`,
+        };
+      }
+
+      const expectedPassword = foundFaculty.password || 'faculty123';
+      if (cleanPass && cleanPass !== expectedPassword) {
+        return { success: false, message: 'Incorrect faculty password.' };
+      }
 
       const facultySession: UserSession = {
         role: 'faculty',
@@ -238,11 +301,28 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         facultyData: foundFaculty,
       };
       setCurrentUser(facultySession);
-      return true;
+      return { success: true };
     }
 
     if (role === 'student') {
-      const foundStudent = students.find((s) => s.roll_no.toUpperCase() === cleanUser) || students[0];
+      const foundStudent = students.find((s) => s.roll_no.toUpperCase() === cleanUser);
+
+      if (!foundStudent) {
+        return { success: false, message: `Student roll number ${cleanUser} not found.` };
+      }
+
+      if (foundStudent.is_active === false) {
+        return {
+          success: false,
+          message: `Student account ${foundStudent.roll_no} has been suspended by Administrator.`,
+        };
+      }
+
+      const expectedPassword = foundStudent.password || 'student123';
+      if (cleanPass && cleanPass !== expectedPassword) {
+        return { success: false, message: 'Incorrect student password.' };
+      }
+
       const studentSession: UserSession = {
         role: 'student',
         username: foundStudent.roll_no,
@@ -250,10 +330,10 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         studentData: foundStudent,
       };
       setCurrentUser(studentSession);
-      return true;
+      return { success: true };
     }
 
-    return false;
+    return { success: false, message: 'Invalid role selection.' };
   };
 
   const logout = () => {
@@ -270,6 +350,104 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         studentData: found,
       });
     }
+  };
+
+  // Change current user's password
+  const changeCurrentUserPassword = (newPassword: string): boolean => {
+    if (!currentUser || !newPassword.trim()) return false;
+
+    if (currentUser.role === 'student' && currentUser.studentData) {
+      const roll = currentUser.studentData.roll_no;
+      setStudents((prev) =>
+        prev.map((s) => (s.roll_no === roll ? { ...s, password: newPassword.trim() } : s))
+      );
+      setCurrentUser((prev) =>
+        prev && prev.studentData
+          ? { ...prev, studentData: { ...prev.studentData, password: newPassword.trim() } }
+          : prev
+      );
+      return true;
+    }
+
+    if (currentUser.role === 'faculty' && currentUser.facultyData) {
+      const fId = currentUser.facultyData.faculty_id;
+      setFaculty((prev) =>
+        prev.map((f) => (f.faculty_id === fId ? { ...f, password: newPassword.trim() } : f))
+      );
+      setCurrentUser((prev) =>
+        prev && prev.facultyData
+          ? { ...prev, facultyData: { ...prev.facultyData, password: newPassword.trim() } }
+          : prev
+      );
+      return true;
+    }
+
+    return false;
+  };
+
+  // Admin Account & Credential Management
+  const updateUserCredentials = (
+    role: 'faculty' | 'student',
+    idOrRoll: string,
+    newUsername: string,
+    newPassword?: string
+  ) => {
+    if (role === 'faculty') {
+      setFaculty((prev) =>
+        prev.map((f) => {
+          if (f.faculty_id === idOrRoll) {
+            return {
+              ...f,
+              username: newUsername.trim() || f.username,
+              password: newPassword ? newPassword.trim() : f.password,
+            };
+          }
+          return f;
+        })
+      );
+    } else {
+      setStudents((prev) =>
+        prev.map((s) => {
+          if (s.roll_no === idOrRoll) {
+            return {
+              ...s,
+              password: newPassword ? newPassword.trim() : s.password,
+            };
+          }
+          return s;
+        })
+      );
+    }
+  };
+
+  const toggleAccountStatus = (
+    role: 'faculty' | 'student',
+    idOrRoll: string,
+    isActive: boolean
+  ) => {
+    if (role === 'faculty') {
+      setFaculty((prev) =>
+        prev.map((f) => (f.faculty_id === idOrRoll ? { ...f, is_active: isActive } : f))
+      );
+    } else {
+      setStudents((prev) =>
+        prev.map((s) => (s.roll_no === idOrRoll ? { ...s, is_active: isActive } : s))
+      );
+    }
+  };
+
+  const resetUserPassword = (role: 'faculty' | 'student', idOrRoll: string): string => {
+    const defaultPass = role === 'faculty' ? 'faculty123' : 'student123';
+    if (role === 'faculty') {
+      setFaculty((prev) =>
+        prev.map((f) => (f.faculty_id === idOrRoll ? { ...f, password: defaultPass } : f))
+      );
+    } else {
+      setStudents((prev) =>
+        prev.map((s) => (s.roll_no === idOrRoll ? { ...s, password: defaultPass } : s))
+      );
+    }
+    return defaultPass;
   };
 
   // Batch Management functions
@@ -345,6 +523,8 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const newStudent: Student = {
       ...studentData,
       id: `std-${Date.now()}`,
+      password: studentData.password || 'student123',
+      is_active: studentData.is_active ?? true,
     };
     setStudents((prev) => [newStudent, ...prev]);
   };
@@ -363,8 +543,21 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const newFac: Faculty = {
       ...facultyData,
       id: facultyData.faculty_id,
+      username: facultyData.username || facultyData.faculty_id,
+      password: facultyData.password || 'faculty123',
+      is_active: facultyData.is_active ?? true,
     };
-    setFaculty((prev) => [...prev, newFac]);
+    setFaculty((prev) => [newFac, ...prev]);
+  };
+
+  const updateFaculty = (facultyId: string, updates: Partial<Faculty>) => {
+    setFaculty((prev) =>
+      prev.map((f) => (f.faculty_id === facultyId ? { ...f, ...updates } : f))
+    );
+  };
+
+  const deleteFaculty = (facultyId: string) => {
+    setFaculty((prev) => prev.filter((f) => f.faculty_id !== facultyId));
   };
 
   const addCourse = (courseData: Omit<Course, 'id'>) => {
@@ -375,7 +568,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     setCourses((prev) => [...prev, newCourse]);
   };
 
-  // Save Attendance for Roster supporting Multiple Slots, L/T/P, and Teaching Notes
+  // Save Attendance & Instantly Push to Real-Time Completed Sessions!
   const saveAttendanceForRoster = (payload: SaveAttendancePayload) => {
     const {
       batchName,
@@ -391,13 +584,17 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
 
     const targetCourse = courses.find((c) => c.code === courseCode);
     const courseName = targetCourse?.name || courseCode;
-    const now = new Date().toISOString();
+    const now = new Date();
+    const timestampStr = `${date} ${now.toTimeString().split(' ')[0]}`;
 
-    // Compute human readable slots string e.g. "Slot I, Slot II (09:30–11:30)"
+    // Compute human readable slots text e.g. "Slot I, Slot II (09:30–11:30)"
     const selectedSlotObjs = slots.filter((s) => slotIds.includes(s.id));
-    const slotNamesText = selectedSlotObjs.length > 0
-      ? `${selectedSlotObjs.map((s) => s.name).join(', ')} (${selectedSlotObjs[0].start_time}–${selectedSlotObjs[selectedSlotObjs.length - 1].end_time})`
-      : 'Regular Period';
+    const slotNamesText =
+      selectedSlotObjs.length > 0
+        ? `${selectedSlotObjs.map((s) => s.name).join(', ')} (${selectedSlotObjs[0].start_time}–${
+            selectedSlotObjs[selectedSlotObjs.length - 1].end_time
+          })`
+        : 'Regular Period';
 
     const newRecords: AttendanceRecord[] = rosterStatuses.map((item) => ({
       id: `att-${Date.now()}-${item.rollNo}`,
@@ -415,11 +612,38 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
       student_name: item.name,
       status: item.isPresent ? 'present' : 'absent',
       marked_by: currentUser?.name || currentUser?.username || 'FAC001',
-      timestamp: now,
+      timestamp: timestampStr,
     }));
 
-    // Save attendance records
+    // Save individual student attendance records
     setAttendanceRecords((prev) => [...newRecords, ...prev]);
+
+    // Create completed session record for Admin Real-Time Tracking!
+    const presentCount = rosterStatuses.filter((r) => r.isPresent).length;
+    const absentCount = rosterStatuses.length - presentCount;
+
+    const completedSession: CompletedClassSession = {
+      id: `session-${Date.now()}`,
+      date,
+      timestamp: timestampStr,
+      faculty_id: currentUser?.username || 'FAC001',
+      faculty_name: currentUser?.name || 'Dr. K. Venkataswamy',
+      department,
+      year_sem: yearSem,
+      batch_id: batchName,
+      course_code: courseCode,
+      course_name: courseName,
+      slot_ids: slotIds,
+      slot_names: slotNamesText,
+      class_type: classType,
+      topics_covered: topicsCovered,
+      total_students: rosterStatuses.length,
+      present_count: presentCount,
+      absent_count: absentCount,
+    };
+
+    // Prepend to completedSessions so Admin Dashboard instantly reflects it at the top!
+    setCompletedSessions((prev) => [completedSession, ...prev]);
 
     // Recalculate student attendance percentage
     setStudents((prev) =>
@@ -428,7 +652,7 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         if (!item) return std;
         const currentPct = std.attendance_pct;
         const slotsCount = slotIds.length || 1;
-        const delta = item.isPresent ? (0.2 * slotsCount) : (-0.4 * slotsCount);
+        const delta = item.isPresent ? 0.2 * slotsCount : -0.4 * slotsCount;
         const updatedPct = Math.min(100, Math.max(40, Math.round((currentPct + delta) * 10) / 10));
         return {
           ...std,
@@ -443,7 +667,6 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     const student = students.find((s) => s.roll_no === rollNo) || students[0];
     const basePct = (student?.attendance_pct || 80) / 100;
 
-    // Filter courses relevant to student's department or semester
     const relevantCourses = courses.filter((c) => c.department === student.department) || courses;
     const listToUse = relevantCourses.length > 0 ? relevantCourses : courses.slice(0, 7);
 
@@ -489,13 +712,15 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
     localStorage.removeItem(STORAGE_KEYS.FACULTY);
     localStorage.removeItem(STORAGE_KEYS.COURSES);
     localStorage.removeItem(STORAGE_KEYS.ATTENDANCE);
+    localStorage.removeItem(STORAGE_KEYS.COMPLETED_SESSIONS);
     localStorage.removeItem(STORAGE_KEYS.SESSION);
     setStudents(INITIAL_STUDENTS);
     setBatches(INITIAL_BATCHES);
     setFaculty(INITIAL_FACULTY);
     setCourses(INITIAL_COURSES);
     setAttendanceRecords(INITIAL_ATTENDANCE_RECORDS);
-    login('student', 'SRU2024001');
+    setCompletedSessions(INITIAL_COMPLETED_SESSIONS);
+    login('student', 'SRU2024001', 'student123');
   };
 
   return (
@@ -508,12 +733,17 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         slots,
         circulars,
         attendanceRecords,
+        completedSessions,
         currentUser,
         academicYear,
         setAcademicYear,
         login,
         logout,
         switchStudentForDemo,
+        changeCurrentUserPassword,
+        updateUserCredentials,
+        toggleAccountStatus,
+        resetUserPassword,
         addBatch,
         updateBatch,
         deleteBatch,
@@ -525,6 +755,8 @@ export const PortalProvider: React.FC<{ children: React.ReactNode }> = ({ childr
         updateStudent,
         deleteStudent,
         addFaculty,
+        updateFaculty,
+        deleteFaculty,
         addCourse,
         saveAttendanceForRoster,
         getStudentCourseAttendance,

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { usePortal } from '../context/PortalContext';
 import { ClassType } from '../types';
 import { DEPARTMENTS, SEMESTERS } from '../data/seedData';
+import { ChangePasswordModal } from '../components/ChangePasswordModal';
 import {
   Calendar,
   Clock,
@@ -20,6 +21,7 @@ import {
   Square,
   AlertCircle,
   BarChart3,
+  KeyRound,
 } from 'lucide-react';
 
 interface FacultyAttendanceProps {
@@ -35,6 +37,9 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
     currentUser,
     saveAttendanceForRoster,
   } = usePortal();
+
+  // Password Modal
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   // Dynamic Selection Toolbar States
   const [selectedDept, setSelectedDept] = useState('CSE');
@@ -259,7 +264,17 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
             </p>
           </div>
 
-          <div className="flex items-center gap-3">
+          <div className="flex flex-wrap items-center gap-2.5">
+            <button
+              type="button"
+              onClick={() => setShowPasswordModal(true)}
+              className="px-3 py-2 bg-slate-100 hover:bg-slate-200 text-slate-700 border border-slate-300 text-xs font-semibold rounded-lg transition-colors flex items-center gap-1.5"
+              title="Update your faculty account password"
+            >
+              <KeyRound className="w-3.5 h-3.5 text-blue-700" />
+              <span>Change Password</span>
+            </button>
+
             <button
               type="button"
               onClick={() => onNavigate('/admin/dashboard')}
@@ -290,6 +305,12 @@ export const FacultyAttendance: React.FC<FacultyAttendanceProps> = ({ onNavigate
             </button>
           </div>
         </div>
+
+        {/* Change Password Modal */}
+        <ChangePasswordModal
+          isOpen={showPasswordModal}
+          onClose={() => setShowPasswordModal(false)}
+        />
 
         {/* Success Alert Banner */}
         {saveSuccessMessage && (

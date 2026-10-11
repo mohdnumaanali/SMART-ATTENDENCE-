@@ -358,6 +358,83 @@ export const StudentReports: React.FC<StudentReportsProps> = ({ onNavigate }) =>
           </div>
         </div>
 
+        {/* Recent Completed Lecture Sessions & Teaching Notes Log */}
+        <div className="bg-white rounded-xl shadow-xs border border-slate-200 overflow-hidden">
+          <div className="bg-[#1A3B70] text-white px-5 py-3.5 flex items-center justify-between">
+            <h3 className="font-bold text-sm tracking-wide">
+              Recent Class Sessions & Faculty Teaching Log (Batch: {student.batch_id})
+            </h3>
+            <span className="text-xs bg-white/15 px-2 py-0.5 rounded font-mono">
+              Live Verified Sessions
+            </span>
+          </div>
+
+          <div className="overflow-x-auto">
+            <table className="w-full text-left text-xs">
+              <thead className="bg-slate-100 text-slate-700 uppercase font-semibold border-b border-slate-200">
+                <tr>
+                  <th className="py-2.5 px-4 w-28">Date</th>
+                  <th className="py-2.5 px-4 w-36">Slot(s)</th>
+                  <th className="py-2.5 px-4 w-20 text-center">Type</th>
+                  <th className="py-2.5 px-4">Course Name & Code</th>
+                  <th className="py-2.5 px-4">What Was Taught Today (Session Log)</th>
+                  <th className="py-2.5 px-4 text-center w-24">My Status</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-slate-100">
+                <tr className="hover:bg-slate-50">
+                  <td className="py-3 px-4 font-mono font-medium">10-Oct-2026</td>
+                  <td className="py-3 px-4 font-mono text-slate-600">Slot I, II (09:30–11:30)</td>
+                  <td className="py-3 px-4 text-center">
+                    <span className="px-2 py-0.5 rounded font-bold text-xs bg-teal-100 text-teal-800">P (Lab)</span>
+                  </td>
+                  <td className="py-3 px-4 font-bold text-slate-800">
+                    AI ASSISTED CODING (CS2101)
+                  </td>
+                  <td className="py-3 px-4 text-slate-700">
+                    Lab Session: AI Test Generation using GitHub Copilot & Python unittest suites
+                  </td>
+                  <td className="py-3 px-4 text-center font-bold text-emerald-700">
+                    <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">PRESENT</span>
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50">
+                  <td className="py-3 px-4 font-mono font-medium">09-Oct-2026</td>
+                  <td className="py-3 px-4 font-mono text-slate-600">Slot I (09:30–10:30)</td>
+                  <td className="py-3 px-4 text-center">
+                    <span className="px-2 py-0.5 rounded font-bold text-xs bg-blue-100 text-[#1A3B70]">L (Lecture)</span>
+                  </td>
+                  <td className="py-3 px-4 font-bold text-slate-800">
+                    CLOUD COMPUTING (CS2102)
+                  </td>
+                  <td className="py-3 px-4 text-slate-700">
+                    Lecture: Virtualization vs Containerization, Docker architecture & namespaces
+                  </td>
+                  <td className="py-3 px-4 text-center font-bold text-emerald-700">
+                    <span className="bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded">PRESENT</span>
+                  </td>
+                </tr>
+                <tr className="hover:bg-slate-50">
+                  <td className="py-3 px-4 font-mono font-medium">08-Oct-2026</td>
+                  <td className="py-3 px-4 font-mono text-slate-600">Slot III (11:30–12:30)</td>
+                  <td className="py-3 px-4 text-center">
+                    <span className="px-2 py-0.5 rounded font-bold text-xs bg-amber-100 text-amber-800">T (Tutorial)</span>
+                  </td>
+                  <td className="py-3 px-4 font-bold text-slate-800">
+                    DATA STRUCTURES (CS2104)
+                  </td>
+                  <td className="py-3 px-4 text-slate-700">
+                    Tutorial: Solving Red-Black Tree rotation balancing problems and proof of height bounds
+                  </td>
+                  <td className="py-3 px-4 text-center font-bold text-red-600">
+                    <span className="bg-red-100 text-red-800 px-2 py-0.5 rounded">ABSENT</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
         {/* Regulations Note */}
         <div className="bg-slate-100 border border-slate-200 rounded-lg p-4 text-xs text-slate-600 space-y-1">
           <p className="font-bold text-slate-800">SR University Attendance Rule Guidelines:</p>

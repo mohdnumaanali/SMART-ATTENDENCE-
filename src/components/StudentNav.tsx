@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { usePortal } from '../context/PortalContext';
+import { ChangePasswordModal } from './ChangePasswordModal';
 import {
   Home,
   BookOpen,
@@ -10,6 +11,7 @@ import {
   LogOut,
   X,
   CheckCircle2,
+  KeyRound,
 } from 'lucide-react';
 
 interface StudentNavProps {
@@ -22,6 +24,7 @@ export const StudentNav: React.FC<StudentNavProps> = ({ activeItem, onNavigate }
   const [modalTitle, setModalTitle] = useState<string | null>(null);
   const [feedbackSent, setFeedbackSent] = useState(false);
   const [feedbackText, setFeedbackText] = useState('');
+  const [showPasswordModal, setShowPasswordModal] = useState(false);
 
   const navItems = [
     { id: 'home', label: 'Home', icon: Home, route: '/student/dashboard' },
@@ -68,20 +71,38 @@ export const StudentNav: React.FC<StudentNavProps> = ({ activeItem, onNavigate }
               })}
             </nav>
 
-            <button
-              type="button"
-              onClick={() => {
-                logout();
-                onNavigate('/login');
-              }}
-              className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
-            >
-              <LogOut className="w-3.5 h-3.5" />
-              <span>Logout</span>
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => setShowPasswordModal(true)}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-slate-700 hover:text-[#1A3B70] hover:bg-slate-100 rounded-md transition-colors border border-slate-200"
+                title="Change your student account password"
+              >
+                <KeyRound className="w-3.5 h-3.5 text-blue-700" />
+                <span>Change Password</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => {
+                  logout();
+                  onNavigate('/login');
+                }}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-semibold text-red-600 hover:text-red-700 hover:bg-red-50 rounded-md transition-colors"
+              >
+                <LogOut className="w-3.5 h-3.5" />
+                <span>Logout</span>
+              </button>
+            </div>
           </div>
         </div>
       </div>
+
+      {/* Change Password Modal */}
+      <ChangePasswordModal
+        isOpen={showPasswordModal}
+        onClose={() => setShowPasswordModal(false)}
+      />
 
       {/* Info Modals for Academics, Profile, Results, Feedback */}
       {modalTitle && (

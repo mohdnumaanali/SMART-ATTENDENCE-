@@ -1,99 +1,94 @@
-import { Student, Batch, Faculty, Course, TimetableSlot, Circular, AttendanceRecord } from '../types';
+import { Student, Batch, Faculty, Course, TimetableSlot, Circular, AttendanceRecord, CompletedClassSession } from '../types';
 
 export const DEPARTMENTS = [
-  { code: 'CSE', name: 'Computer Science & Engineering', batchCount: 74 },
-  { code: 'ECE', name: 'Electronics & Communication Engineering', batchCount: 30 },
-  { code: 'EEE', name: 'Electrical & Electronics Engineering', batchCount: 24 },
-  { code: 'CE', name: 'Civil Engineering', batchCount: 24 },
-  { code: 'ME', name: 'Mechanical Engineering', batchCount: 24 },
-  { code: 'AGRI', name: 'Agricultural Engineering', batchCount: 20 },
-  { code: 'BM', name: 'Biomedical Engineering', batchCount: 20 },
+  { code: 'CSE', name: 'Computer Science & Engineering', batchCount: 74, facultyCount: 50 },
+  { code: 'ECE', name: 'Electronics & Communication Engineering', batchCount: 30, facultyCount: 30 },
+  { code: 'EEE', name: 'Electrical & Electronics Engineering', batchCount: 24, facultyCount: 25 },
+  { code: 'CE', name: 'Civil Engineering', batchCount: 24, facultyCount: 25 },
+  { code: 'ME', name: 'Mechanical Engineering', batchCount: 24, facultyCount: 25 },
+  { code: 'AGRI', name: 'Agricultural Engineering', batchCount: 20, facultyCount: 25 },
+  { code: 'BM', name: 'Biomedical Engineering', batchCount: 20, facultyCount: 20 },
 ];
 
 export const SEMESTERS = ['1-1', '1-2', '2-1', '2-2', '3-1', '3-2', '4-1', '4-2'];
 
-export const INITIAL_FACULTY: Faculty[] = [
-  {
-    id: 'FAC001',
-    faculty_id: 'FAC001',
-    name: 'Dr. K. Venkataswamy',
-    department: 'CSE',
-    designation: 'Professor & Head of Department',
-    email: 'k.venkataswamy@sru.edu.in',
-    phone: '+91 98480 12345',
-    courses: ['CS2101', 'CS2103'],
-  },
-  {
-    id: 'FAC002',
-    faculty_id: 'FAC002',
-    name: 'Dr. M. Sujatha',
-    department: 'CSE',
-    designation: 'Associate Professor',
-    email: 'm.sujatha@sru.edu.in',
-    phone: '+91 94401 54321',
-    courses: ['CS2102', 'CS2105'],
-  },
-  {
-    id: 'FAC003',
-    faculty_id: 'FAC003',
-    name: 'Dr. P. Ramesh Babu',
-    department: 'ECE',
-    designation: 'Assistant Professor',
-    email: 'p.rameshbabu@sru.edu.in',
-    phone: '+91 98665 99881',
-    courses: ['EC2101', 'EC2102'],
-  },
-  {
-    id: 'FAC004',
-    faculty_id: 'FAC004',
-    name: 'Dr. V. Nageshwar Rao',
-    department: 'EEE',
-    designation: 'Professor',
-    email: 'v.nageshwar@sru.edu.in',
-    phone: '+91 94901 88776',
-    courses: ['EE2101'],
-  },
-  {
-    id: 'FAC005',
-    faculty_id: 'FAC005',
-    name: 'Dr. B. Shravan Kumar',
-    department: 'CE',
-    designation: 'Associate Professor',
-    email: 'b.shravan@sru.edu.in',
-    phone: '+91 98492 44332',
-    courses: ['CE2101'],
-  },
-  {
-    id: 'FAC006',
-    faculty_id: 'FAC006',
-    name: 'Dr. T. Praveen Reddy',
-    department: 'ME',
-    designation: 'Associate Professor',
-    email: 't.praveen@sru.edu.in',
-    phone: '+91 98485 11990',
-    courses: ['ME2101'],
-  },
-  {
-    id: 'FAC007',
-    faculty_id: 'FAC007',
-    name: 'Dr. G. Lakshmi',
-    department: 'AGRI',
-    designation: 'Assistant Professor',
-    email: 'g.lakshmi@sru.edu.in',
-    phone: '+91 99081 22334',
-    courses: ['AG2101'],
-  },
-  {
-    id: 'FAC008',
-    faculty_id: 'FAC008',
-    name: 'Dr. S. Devender',
-    department: 'BM',
-    designation: 'Assistant Professor',
-    email: 's.devender@sru.edu.in',
-    phone: '+91 97011 33445',
-    courses: ['BM2101'],
-  },
+const FACULTY_FIRST_NAMES = [
+  'Venkataswamy', 'Sujatha', 'Ramesh Babu', 'Nageshwar Rao', 'Shravan Kumar', 'Praveen Reddy', 'Lakshmi', 'Devender',
+  'Radha Krishna', 'Anuradha', 'Srinivasulu', 'Madhuri', 'Satyanarayana', 'Padmavathi', 'Chandra Sekhar', 'Kavitha',
+  'Muralidhar', 'Sandhya', 'Vijay Kumar', 'Hymavathi', 'Rajendra Prasad', 'Swarna Latha', 'Bhanu Murthy', 'Usha Rani',
+  'Ravinder', 'Geetha', 'Subramanyam', 'Sailaja', 'Prabhakar', 'Suma', 'Sudhakar', 'Nalani', 'Jagadeesh', 'Aparna',
+  'Mohan Rao', 'Pushpa', 'Anjaneyulu', 'Hemalatha', 'Bhaskar Rao', 'Vanaja', 'Ramanadha', 'Saritha', 'Koteshwar', 'Bhavani',
+  'Sanjeev', 'Roopa', 'Sitaram', 'Sirisha', 'Hariprasad', 'Suneetha'
 ];
+
+const FACULTY_LAST_NAMES = [
+  'Kalvala', 'Mamidi', 'Pendem', 'Vangala', 'Bommireddy', 'Thota', 'Gaddam', 'Samala',
+  'Chinthala', 'Katta', 'Muppidi', 'Guduru', 'Yelamanchili', 'Nallamothu', 'Dasari', 'Janga',
+  'Chilukuri', 'Vaddi', 'Gollapudi', 'Maddipati', 'Pasham', 'Kompally', 'Chilakamarthi', 'Suraneni'
+];
+
+const DESIGNATIONS = [
+  'Professor & Head of Department',
+  'Professor',
+  'Associate Professor',
+  'Associate Professor',
+  'Assistant Professor (Senior Scale)',
+  'Assistant Professor',
+  'Assistant Professor',
+];
+
+/**
+ * Generate exactly 200 faculty accounts across departments:
+ * - CSE: 50
+ * - ECE: 30
+ * - EEE: 25
+ * - CE: 25
+ * - ME: 25
+ * - AGRI: 25
+ * - BM: 20
+ * Total = 200 faculty!
+ */
+export function generate200Faculty(): Faculty[] {
+  const facultyList: Faculty[] = [];
+  let globalCount = 1;
+
+  DEPARTMENTS.forEach((dept) => {
+    const { code, facultyCount } = dept;
+
+    for (let fIdx = 1; fIdx <= facultyCount; fIdx++) {
+      const facNum = globalCount++;
+      const idStr = facNum.toString().padStart(3, '0');
+      const faculty_id = `FAC${idStr}`;
+
+      const fName = FACULTY_FIRST_NAMES[(facNum * 7) % FACULTY_FIRST_NAMES.length];
+      const lName = FACULTY_LAST_NAMES[(facNum * 3) % FACULTY_LAST_NAMES.length];
+      const desig = fIdx === 1 ? 'Professor & Head of Department' : DESIGNATIONS[(fIdx * 3) % DESIGNATIONS.length];
+
+      // Assign realistic courses
+      const coursePrefix = code === 'CSE' ? 'CS' : code === 'ECE' ? 'EC' : code === 'EEE' ? 'EE' : code === 'CE' ? 'CE' : code === 'ME' ? 'ME' : code === 'AGRI' ? 'AG' : 'BM';
+      const course1 = `${coursePrefix}2101`;
+      const course2 = `${coursePrefix}2102`;
+
+      facultyList.push({
+        id: faculty_id,
+        faculty_id,
+        name: `Dr. ${fName} ${lName}`,
+        department: code,
+        designation: desig,
+        email: `${faculty_id.toLowerCase()}@sru.edu.in`,
+        phone: `+91 98480 ${(10000 + facNum).toString()}`,
+        courses: [course1, course2],
+        username: faculty_id,
+        password: 'faculty123',
+        is_active: true,
+      });
+    }
+  });
+
+  return facultyList;
+}
+
+export const INITIAL_FACULTY: Faculty[] = generate200Faculty();
 
 // Slots with start_time and end_time ONLY (no subject names)
 export const INITIAL_SLOTS: TimetableSlot[] = [
@@ -189,7 +184,6 @@ export const INITIAL_CIRCULARS: Circular[] = [
   },
 ];
 
-// Reusable Name pools for generating realistic 30 students per batch
 const FIRST_NAMES = [
   'Aarav', 'Ananya', 'Rohan', 'Priya', 'Aditya', 'Sneha', 'Vikram', 'Divya', 'Karthik', 'Pooja',
   'Sai Krishna', 'Kavya', 'Rahul', 'Deepika', 'Manish', 'Anjali', 'Arjun', 'Bhavana', 'Chaitanya', 'Harini',
@@ -208,17 +202,6 @@ const FATHER_NAMES = [
   'Krishna Murthy', 'Chandra Sekhar', 'Govinda Rao', 'Subba Rao', 'Ramana Murthy', 'Mohan', 'Bhaskar', 'Sudhakar'
 ];
 
-/**
- * Generate Batches and Students deterministically:
- * - CSE: 74 batches (30 students each)
- * - ECE: 30 batches
- * - EEE: 24 batches
- * - CE: 24 batches
- * - ME: 24 batches
- * - AGRI: 20 batches
- * - BM: 20 batches
- * All distributed evenly across semesters 1-1, 1-2, 2-1, 2-2, 3-1, 3-2, 4-1, 4-2!
- */
 export function generateUniversityBatchesAndStudents() {
   const batches: Batch[] = [];
   const students: Student[] = [];
@@ -230,9 +213,8 @@ export function generateUniversityBatchesAndStudents() {
 
     for (let bIndex = 1; bIndex <= batchCount; bIndex++) {
       const batchNumStr = bIndex.toString().padStart(2, '0');
-      const batchName = `25${code}${batchNumStr}`; // e.g. 25CSE01 to 25CSE74
+      const batchName = `25${code}${batchNumStr}`;
 
-      // Distribute across 8 semesters evenly so EVERY semester has batches!
       const semesterIndex = (bIndex - 1) % SEMESTERS.length;
       const year_sem = SEMESTERS[semesterIndex];
 
@@ -243,20 +225,18 @@ export function generateUniversityBatchesAndStudents() {
         department: code,
         year_sem,
         academic_year: '2024-25',
-        student_count: 30, // exactly 30 students
+        student_count: 30,
         description: `B.Tech ${dept.name} - Section ${String.fromCharCode(65 + ((bIndex - 1) % 4))}`,
         created_at: '2024-07-15',
       };
       batches.push(batchObj);
 
-      // Create exactly 30 students for this batch
       for (let sIndex = 1; sIndex <= 30; sIndex++) {
         const studentIndex = globalStudentCounter++;
         const sNumStr = sIndex.toString().padStart(2, '0');
-        // Standard roll number: 25CSE0101 to 25CSE0130, or SRU2024001 for the very first student
         let roll_no = `${batchName}${sNumStr}`;
         if (code === 'CSE' && bIndex === 1 && sIndex === 1) {
-          roll_no = 'SRU2024001'; // preserved for default demo student login!
+          roll_no = 'SRU2024001';
         }
 
         const fName = FIRST_NAMES[(studentIndex + sIndex) % FIRST_NAMES.length];
@@ -265,10 +245,9 @@ export function generateUniversityBatchesAndStudents() {
         const name = `${fName} ${lName}`;
         const father_name = `${fatherFName} ${lName}`;
 
-        // Ensure some low attendance for alerts (<75%) and realistic spread
         let attendance_pct = 85.0;
         if (sIndex === 7 || sIndex === 18) {
-          attendance_pct = Math.round((58 + (sIndex % 15)) * 10) / 10; // Low attendance (<75%)
+          attendance_pct = Math.round((58 + (sIndex % 15)) * 10) / 10;
         } else if (sIndex % 4 === 0) {
           attendance_pct = Math.round((91 + (sIndex % 8)) * 10) / 10;
         } else {
@@ -294,6 +273,8 @@ export function generateUniversityBatchesAndStudents() {
           attendance_pct,
           email: `${roll_no.toLowerCase()}@sru.edu.in`,
           phone: `+91 9${(800000000 + (studentIndex * 12345) % 100000000).toString().slice(0, 9)}`,
+          password: 'student123',
+          is_active: true,
         });
       }
     }
@@ -307,15 +288,94 @@ const { batches: GENERATED_BATCHES, students: GENERATED_STUDENTS } = generateUni
 export const INITIAL_BATCHES: Batch[] = GENERATED_BATCHES;
 export const INITIAL_STUDENTS: Student[] = GENERATED_STUDENTS;
 
-// Seed recent attendance records
-export const INITIAL_ATTENDANCE_RECORDS: AttendanceRecord[] = [
+// Initial Completed Class Sessions for real-time monitoring and tracking
+export const INITIAL_COMPLETED_SESSIONS: CompletedClassSession[] = [
   {
-    id: 'att-1',
-    date: '2026-10-09',
+    id: 'session-101',
+    date: '2026-10-10',
+    timestamp: '2026-10-10 11:35:00',
+    faculty_id: 'FAC001',
+    faculty_name: 'Dr. Venkataswamy Kalvala',
+    department: 'CSE',
+    year_sem: '2-1',
+    batch_id: '25CSE01',
+    course_code: 'CS2101',
+    course_name: 'AI ASSISTED CODING',
     slot_ids: ['slot-1', 'slot-2'],
     slot_names: 'Slot I, Slot II (09:30–11:30)',
     class_type: 'P',
-    topics_covered: 'Hands-on Lab: Prompt engineering and Copilot automated test generation in Python',
+    topics_covered: 'Lab Session: AI Test Generation using GitHub Copilot & Python unittest suites',
+    total_students: 30,
+    present_count: 28,
+    absent_count: 2,
+  },
+  {
+    id: 'session-102',
+    date: '2026-10-10',
+    timestamp: '2026-10-10 10:35:00',
+    faculty_id: 'FAC002',
+    faculty_name: 'Dr. Sujatha Mamidi',
+    department: 'CSE',
+    year_sem: '2-1',
+    batch_id: '25CSE02',
+    course_code: 'CS2102',
+    course_name: 'CLOUD COMPUTING & VIRTUALIZATION',
+    slot_ids: ['slot-1'],
+    slot_names: 'Slot I (09:30–10:30)',
+    class_type: 'L',
+    topics_covered: 'Lecture: Hypervisors (Type 1 vs Type 2) & AWS EC2 instance lifecycle',
+    total_students: 30,
+    present_count: 27,
+    absent_count: 3,
+  },
+  {
+    id: 'session-103',
+    date: '2026-10-09',
+    timestamp: '2026-10-09 12:35:00',
+    faculty_id: 'FAC051',
+    faculty_name: 'Dr. Ramesh Babu Pendem',
+    department: 'ECE',
+    year_sem: '2-1',
+    batch_id: '25ECE01',
+    course_code: 'EC2101',
+    course_name: 'SIGNALS AND SYSTEMS',
+    slot_ids: ['slot-3'],
+    slot_names: 'Slot III (11:30–12:30)',
+    class_type: 'T',
+    topics_covered: 'Tutorial: Fourier Series analysis of periodic rectangular & triangular pulse trains',
+    total_students: 30,
+    present_count: 26,
+    absent_count: 4,
+  },
+  {
+    id: 'session-104',
+    date: '2026-10-09',
+    timestamp: '2026-10-09 15:35:00',
+    faculty_id: 'FAC081',
+    faculty_name: 'Dr. Nageshwar Rao Vangala',
+    department: 'EEE',
+    year_sem: '2-1',
+    batch_id: '25EEE01',
+    course_code: 'EE2101',
+    course_name: 'ELECTRICAL MACHINES-I',
+    slot_ids: ['slot-5', 'slot-6'],
+    slot_names: 'Slot V, Slot VI (01:30–03:30)',
+    class_type: 'P',
+    topics_covered: 'Lab: Open-circuit & short-circuit test characteristics on 5kVA single-phase transformer',
+    total_students: 30,
+    present_count: 29,
+    absent_count: 1,
+  },
+];
+
+export const INITIAL_ATTENDANCE_RECORDS: AttendanceRecord[] = [
+  {
+    id: 'att-1',
+    date: '2026-10-10',
+    slot_ids: ['slot-1', 'slot-2'],
+    slot_names: 'Slot I, Slot II (09:30–11:30)',
+    class_type: 'P',
+    topics_covered: 'Lab Session: AI Test Generation using GitHub Copilot & Python unittest suites',
     course_code: 'CS2101',
     course_name: 'AI ASSISTED CODING',
     department: 'CSE',
@@ -325,24 +385,6 @@ export const INITIAL_ATTENDANCE_RECORDS: AttendanceRecord[] = [
     student_name: 'Aarav Reddy',
     status: 'present',
     marked_by: 'FAC001',
-    timestamp: '2026-10-09 11:35:00',
-  },
-  {
-    id: 'att-2',
-    date: '2026-10-08',
-    slot_ids: ['slot-1'],
-    slot_names: 'Slot I (09:30–10:30)',
-    class_type: 'L',
-    topics_covered: 'Lecture: Virtualization vs Containerization, Docker architecture & namespaces',
-    course_code: 'CS2102',
-    course_name: 'CLOUD COMPUTING & VIRTUALIZATION',
-    department: 'CSE',
-    year_sem: '2-1',
-    batch_id: '25CSE01',
-    student_roll_no: 'SRU2024001',
-    student_name: 'Aarav Reddy',
-    status: 'present',
-    marked_by: 'FAC002',
-    timestamp: '2026-10-08 10:35:00',
+    timestamp: '2026-10-10 11:35:00',
   },
 ];

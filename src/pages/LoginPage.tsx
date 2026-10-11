@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { usePortal } from '../context/PortalContext';
 import { CaptchaCanvas } from '../components/CaptchaCanvas';
+import { Role } from '../types';
 import {
   GraduationCap,
   Users,
@@ -17,30 +18,39 @@ import {
 } from 'lucide-react';
 
 interface LoginPageProps {
-  initialRole?: 'student' | 'faculty' | 'admin';
+  initialRole?: Role;
   onNavigate: (route: string) => void;
 }
 
 export const LoginPage: React.FC<LoginPageProps> = ({ initialRole = 'student', onNavigate }) => {
   const { login, circulars, academicYear, setAcademicYear } = usePortal();
 
-  // Role toggle: 'student' | 'faculty'
-  const [selectedRole, setSelectedRole] = useState<'student' | 'faculty'>(
-    initialRole === 'faculty' ? 'faculty' : 'student'
-  );
+  // Role toggle: 'student' | 'faculty' | 'admin'
+  const [selectedRole, setSelectedRole] = useState<Role>(initialRole);
 
-  const [username, setUsername] = useState(
-    initialRole === 'faculty' ? 'FAC001' : 'SRU2024001'
-  );
-  const [password, setPassword] = useState('student123');
+  const [username, setUsername] = useState(() => {
+    if (initialRole === 'admin') return 'ADMIN';
+    if (initialRole === 'faculty') return 'FAC001';
+    return 'SRU2024001';
+  });
+
+  const [password, setPassword] = useState(() => {
+    if (initialRole === 'admin') return 'admin123';
+    if (initialRole === 'faculty') return 'faculty123';
+    return 'student123';
+  });
+
   const [captchaInput, setCaptchaInput] = useState('');
   const [generatedCaptcha, setGeneratedCaptcha] = useState('');
   const [errorMsg, setErrorMsg] = useState('');
 
-  const handleRoleToggle = (newRole: 'student' | 'faculty') => {
+  const handleRoleToggle = (newRole: Role) => {
     setSelectedRole(newRole);
     setErrorMsg('');
-    if (newRole === 'faculty') {
+    if (newRole === 'admin') {
+      setUsername('ADMIN');
+      setPassword('admin123');
+    } else if (newRole === 'faculty') {
       setUsername('FAC001');
       setPassword('faculty123');
     } else {
@@ -49,12 +59,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialRole = 'student', o
     }
   };
 
-  const handleQuickFill = (role: 'student' | 'faculty' | 'admin', user: string, pass: string) => {
-    if (role === 'admin') {
-      login('admin', 'ADMIN');
-      onNavigate('/admin/dashboard');
-      return;
-    }
+  const handleQuickFill = (role: Role, user: string, pass: string) => {
     setSelectedRole(role);
     setUsername(user);
     setPassword(pass);
@@ -72,19 +77,21 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialRole = 'student', o
     }
 
     if (!username.trim()) {
-      setErrorMsg('Please enter your Enrollment No / Username');
+      setErrorMsg('Please enter your Username / ID / Roll No.');
       return;
     }
 
-    const success = login(selectedRole, username, password);
-    if (success) {
+    const result = login(selectedRole, username, password);
+    if (result.success) {
       if (selectedRole === 'student') {
         onNavigate('/student/dashboard');
-      } else {
+      } else if (selectedRole === 'faculty') {
         onNavigate('/faculty/attendance');
+      } else {
+        onNavigate('/admin/dashboard');
       }
     } else {
-      setErrorMsg('User not found. Please check your credentials or click a quick demo login.');
+      setErrorMsg(result.message || 'Login failed. Please verify your credentials or account status.');
     }
   };
 
@@ -131,7 +138,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialRole = 'student', o
           <div className="lg:col-span-5 p-6 sm:p-8 flex flex-col justify-between border-b lg:border-b-0 lg:border-r border-slate-200">
             <div>
               {/* Login Title & Portal Header */}
-              <div className="mb-6">
+              <div className="mb-5">
                 <div className="flex items-center gap-2 text-[#1A3B70] font-serif font-black text-xl">
                   <span>SR UNIVERSITY</span>
                 </div>
@@ -139,35 +146,49 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialRole = 'student', o
                   Single Sign-On Authentication
                 </h2>
                 <p className="text-xs text-slate-500 mt-0.5">
-                  Sign in to access Attendance, Academics & Performance Analytics
+                  Secure access for Students, Faculty (200 Members), and Administrators
                 </p>
               </div>
 
-              {/* Role Toggle Switch: Student vs Staff */}
-              <div className="bg-slate-100 p-1 rounded-lg flex items-center mb-6 border border-slate-200">
+              {/* 3-Way Role Toggle: Student vs Faculty vs Admin */}
+              <div className="bg-slate-100 p-1 rounded-lg grid grid-cols-3 gap-1 mb-5 border border-slate-200 text-xs font-bold">
                 <button
                   type="button"
                   onClick={() => handleRoleToggle('student')}
-                  className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${
+                  className={`py-2 rounded-md flex items-center justify-center gap-1 transition-all ${
                     selectedRole === 'student'
                       ? 'bg-[#1A3B70] text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <GraduationCap className="w-4 h-4" />
-                  <span>Student Login</span>
+                  <GraduationCap className="w-3.5 h-3.5" />
+                  <span>Student</span>
                 </button>
+
                 <button
                   type="button"
                   onClick={() => handleRoleToggle('faculty')}
-                  className={`flex-1 py-2 text-xs sm:text-sm font-bold rounded-md flex items-center justify-center gap-1.5 transition-all ${
+                  className={`py-2 rounded-md flex items-center justify-center gap-1 transition-all ${
                     selectedRole === 'faculty'
                       ? 'bg-[#1A3B70] text-white shadow-sm'
                       : 'text-slate-600 hover:text-slate-900'
                   }`}
                 >
-                  <Users className="w-4 h-4" />
-                  <span>Staff Login</span>
+                  <Users className="w-3.5 h-3.5" />
+                  <span>Faculty</span>
+                </button>
+
+                <button
+                  type="button"
+                  onClick={() => handleRoleToggle('admin')}
+                  className={`py-2 rounded-md flex items-center justify-center gap-1 transition-all ${
+                    selectedRole === 'admin'
+                      ? 'bg-purple-700 text-white shadow-sm'
+                      : 'text-slate-600 hover:text-slate-900'
+                  }`}
+                >
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>Admin</span>
                 </button>
               </div>
 
@@ -199,26 +220,38 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialRole = 'student', o
                   </div>
                 )}
 
-                {/* Username / Enrollment No */}
+                {/* Username / Roll No / ID */}
                 <div>
                   <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                     <User className="w-3.5 h-3.5 text-[#1A3B70]" />
                     <span>
-                      {selectedRole === 'student' ? 'Enrollment No / Roll No' : 'Staff Employee ID / Username'}
+                      {selectedRole === 'student'
+                        ? 'Enrollment No / Student Roll No'
+                        : selectedRole === 'faculty'
+                        ? 'Faculty ID / Username (FAC001–FAC200)'
+                        : 'Administrator Username (ADMIN)'}
                     </span>
                   </label>
                   <input
                     type="text"
                     value={username}
                     onChange={(e) => setUsername(e.target.value)}
-                    placeholder={selectedRole === 'student' ? 'e.g. SRU2024001' : 'e.g. FAC001'}
+                    placeholder={
+                      selectedRole === 'student'
+                        ? 'e.g. SRU2024001 or 25CSE0101'
+                        : selectedRole === 'faculty'
+                        ? 'e.g. FAC001'
+                        : 'e.g. ADMIN'
+                    }
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-[#1A3B70] focus:border-[#1A3B70] outline-none font-mono uppercase"
                     required
                   />
                   <span className="text-[10px] text-slate-400 mt-0.5 block">
                     {selectedRole === 'student'
-                      ? '100 student records available (SRU2024001 to SRU2024100)'
-                      : 'Faculty ID: FAC001 (Dr. Venkataswamy) or FAC002, FAC003'}
+                      ? 'Default password: student123 (Changeable via Student Portal)'
+                      : selectedRole === 'faculty'
+                      ? '200 Faculty accounts across all departments (Default: faculty123)'
+                      : 'Full control over batches, credentials, and live monitoring'}
                   </span>
                 </div>
 
@@ -232,7 +265,7 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialRole = 'student', o
                     type="password"
                     value={password}
                     onChange={(e) => setPassword(e.target.value)}
-                    placeholder="Enter your password"
+                    placeholder="Enter password"
                     className="w-full px-3 py-2 text-sm border border-slate-300 rounded-md focus:ring-2 focus:ring-[#1A3B70] focus:border-[#1A3B70] outline-none"
                     required
                   />
@@ -249,37 +282,44 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialRole = 'student', o
                     onCaptchaGenerated={setGeneratedCaptcha}
                   />
                   <span className="text-[10px] text-slate-400 mt-1 block">
-                    Type the 5 characters shown above in the box (case insensitive)
+                    Type the 5 characters shown above in the box
                   </span>
                 </div>
 
                 {/* Submit Sign In Button */}
                 <button
                   type="submit"
-                  className="w-full py-2.5 px-4 bg-[#1A3B70] hover:bg-[#0F2C59] text-white font-bold rounded-md shadow-sm transition-all flex items-center justify-center gap-2 text-sm mt-2"
+                  className={`w-full py-2.5 px-4 text-white font-bold rounded-md shadow-sm transition-all flex items-center justify-center gap-2 text-sm mt-2 ${
+                    selectedRole === 'admin'
+                      ? 'bg-purple-700 hover:bg-purple-800'
+                      : 'bg-[#1A3B70] hover:bg-[#0F2C59]'
+                  }`}
                 >
-                  <span>Sign in</span>
+                  <span>
+                    {selectedRole === 'student'
+                      ? 'Sign In to Student Portal'
+                      : selectedRole === 'faculty'
+                      ? 'Sign In to Faculty Portal'
+                      : 'Sign In to Admin Control Panel'}
+                  </span>
                   <ArrowRight className="w-4 h-4" />
                 </button>
               </form>
             </div>
 
             <div className="pt-6 border-t border-slate-200 mt-6 text-[11px] text-slate-500 flex items-center justify-between">
-              <span>SRU ERP Portal v3.4.2</span>
+              <span>SRU ERP Portal v5.0</span>
               <button
                 type="button"
-                onClick={() => {
-                  login('admin', 'ADMIN');
-                  onNavigate('/admin/dashboard');
-                }}
+                onClick={() => handleRoleToggle('admin')}
                 className="text-[#1A3B70] hover:underline font-semibold"
               >
-                Admin Portal Login →
+                Administrator Access →
               </button>
             </div>
           </div>
 
-          {/* Right Column: Split Layout (Circulars for Student OR Staff Banner for Staff) */}
+          {/* Right Column: Split Layout */}
           <div className="lg:col-span-7 p-6 sm:p-8 bg-slate-50 flex flex-col justify-between">
             {selectedRole === 'student' ? (
               /* Student View: Circulars Table */
@@ -343,63 +383,108 @@ export const LoginPage: React.FC<LoginPageProps> = ({ initialRole = 'student', o
                 <div className="mt-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-xs text-amber-900 flex items-start gap-2">
                   <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
                   <div>
-                    <strong>Statutory Attendance Rule:</strong> Minimum 75% attendance in aggregate across all registered theory & laboratory courses is strictly required to be eligible for End-Semester Examinations.
+                    <strong>Statutory Attendance Rule:</strong> Minimum 75% attendance in aggregate across all registered courses is strictly required to be eligible for End-Semester Examinations.
                   </div>
                 </div>
               </div>
-            ) : (
-              /* Staff View: Faculty Banner & Guidelines */
+            ) : selectedRole === 'faculty' ? (
+              /* Staff View: Faculty Information */
               <div className="space-y-4">
                 <div className="flex items-center justify-between pb-2 border-b border-slate-200">
                   <div className="flex items-center gap-2">
                     <BookOpen className="w-5 h-5 text-[#1A3B70]" />
                     <h3 className="font-bold text-slate-800 text-sm tracking-wide">
-                      Faculty Attendance Guidelines & Information
+                      Faculty Attendance & Teaching Log Portal
                     </h3>
                   </div>
                   <span className="text-[11px] font-semibold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded">
-                    Staff Portal
+                    200 Faculty Active
                   </span>
                 </div>
 
-                {/* Staff Banner Card */}
                 <div className="bg-gradient-to-r from-[#1A3B70] to-[#0F2C59] text-white p-5 rounded-lg shadow-sm">
                   <h4 className="text-base font-bold text-amber-300">
-                    Real-time Slot-wise Attendance Submission
+                    Slot-wise Attendance & Daily Session Log
                   </h4>
                   <p className="text-xs text-blue-100 mt-1 leading-relaxed">
-                    Faculty members must submit student attendance for every assigned period (Slots I through VIII) within 15 minutes of lecture completion. Dynamic batch filtering allows marking individual lab and lecture sections.
+                    Faculty members can mark single or multiple slot blocks, select class type (Lecture / Tutorial / Practical Lab), and record what was taught today. Password can be updated directly from the Faculty Portal.
                   </p>
                   <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
                     <div className="bg-white/10 p-2 rounded">
-                      <span className="block font-black text-amber-400 text-base">8</span>
-                      <span className="text-[10px] text-blue-200">Daily Slots</span>
+                      <span className="block font-black text-amber-400 text-base">200</span>
+                      <span className="text-[10px] text-blue-200">Faculty Staff</span>
                     </div>
                     <div className="bg-white/10 p-2 rounded">
-                      <span className="block font-black text-amber-400 text-base">100</span>
-                      <span className="text-[10px] text-blue-200">Total Enrolled</span>
+                      <span className="block font-black text-amber-400 text-base">216</span>
+                      <span className="text-[10px] text-blue-200">Total Batches</span>
                     </div>
                     <div className="bg-white/10 p-2 rounded">
-                      <span className="block font-black text-amber-400 text-base">3</span>
-                      <span className="text-[10px] text-blue-200">Lab Batches</span>
+                      <span className="block font-black text-amber-400 text-base">6,480</span>
+                      <span className="text-[10px] text-blue-200">Students Enrolled</span>
                     </div>
                   </div>
                 </div>
 
-                {/* Important Staff Reminders */}
                 <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2 text-xs text-slate-700">
-                  <h5 className="font-bold text-[#1A3B70]">Daily Checklist for Faculty:</h5>
+                  <h5 className="font-bold text-[#1A3B70]">Faculty Portal Features:</h5>
                   <ul className="space-y-1.5 list-disc list-inside text-slate-600">
-                    <li>Select designated Department & Year/Semester before marking roster.</li>
-                    <li>Choose specific <strong>Batch (e.g. 25CAIBTAIB01)</strong> for lab hours or <strong>All Batches</strong> for combined lectures.</li>
-                    <li>Verify timetable slot period checkbox before saving attendance.</li>
-                    <li>Utilize "Check All" / "UnCheck All" buttons for high-efficiency marking.</li>
+                    <li>Multi-slot selection (e.g. Slot I + Slot II for 2-hour labs).</li>
+                    <li>Class classification: Lecture (L), Tutorial (T), Practical Lab (P).</li>
+                    <li>Session Teaching Notes: "What was taught today" summary.</li>
+                    <li>Password Management: Change password securely at any time.</li>
+                  </ul>
+                </div>
+              </div>
+            ) : (
+              /* Admin View: Overview of Administrator Controls */
+              <div className="space-y-4">
+                <div className="flex items-center justify-between pb-2 border-b border-slate-200">
+                  <div className="flex items-center gap-2">
+                    <ShieldCheck className="w-5 h-5 text-purple-700" />
+                    <h3 className="font-bold text-slate-800 text-sm tracking-wide">
+                      Administrator Oversight & Control Center
+                    </h3>
+                  </div>
+                  <span className="text-[11px] font-semibold text-purple-700 bg-purple-100 px-2 py-0.5 rounded">
+                    Admin Portal
+                  </span>
+                </div>
+
+                <div className="bg-gradient-to-r from-purple-800 to-indigo-900 text-white p-5 rounded-lg shadow-sm">
+                  <h4 className="text-base font-bold text-amber-300">
+                    Real-Time Attendance Monitoring & Credential Governance
+                  </h4>
+                  <p className="text-xs text-purple-100 mt-1 leading-relaxed">
+                    Full supervisory control to add/remove batches, view live completed classes saved by faculty, assign login credentials, reset passwords, and revoke accounts.
+                  </p>
+                  <div className="mt-3 grid grid-cols-3 gap-2 text-center text-xs">
+                    <div className="bg-white/10 p-2 rounded">
+                      <span className="block font-black text-amber-300 text-base">Full</span>
+                      <span className="text-[10px] text-purple-200">Batch Control</span>
+                    </div>
+                    <div className="bg-white/10 p-2 rounded">
+                      <span className="block font-black text-amber-300 text-base">Real-Time</span>
+                      <span className="text-[10px] text-purple-200">Live Sync</span>
+                    </div>
+                    <div className="bg-white/10 p-2 rounded">
+                      <span className="block font-black text-amber-300 text-base">Pass Reset</span>
+                      <span className="text-[10px] text-purple-200">User Security</span>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="bg-white p-4 rounded-lg border border-slate-200 space-y-2 text-xs text-slate-700">
+                  <h5 className="font-bold text-purple-800">Admin Privileges:</h5>
+                  <ul className="space-y-1.5 list-disc list-inside text-slate-600">
+                    <li>Create & delete batches across all 7 engineering departments.</li>
+                    <li>Assign or revoke faculty and student login accounts instantly.</li>
+                    <li>Reset user passwords or assign custom usernames.</li>
+                    <li>Live attendance monitor: track completed classes and teaching notes in real time.</li>
                   </ul>
                 </div>
               </div>
             )}
 
-            {/* University Helpline footer */}
             <div className="mt-6 pt-4 border-t border-slate-200 text-[11px] text-slate-500 flex flex-wrap items-center justify-between gap-2">
               <span>SR University IT Helpdesk: Ext. 402 / erp@sru.edu.in</span>
               <span className="text-[#1A3B70] font-medium">Monday - Saturday (9:00 AM - 5:00 PM)</span>
