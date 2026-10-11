@@ -1,0 +1,7 @@
+{
+  "name": "SRU Smart Attendance Portal",
+  "description": "Smart Attendance Management and Analytics Portal for SRU University featuring student dashboard, faculty marking, dynamic batch management, and admin oversight.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
+
